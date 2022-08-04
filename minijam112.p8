@@ -21,7 +21,7 @@ function _init()
 		lx=4,ly=4, --local x/y can be changed , not a great representation , just one way of doing it
 	}
 	scary_obj={ --example enemy object
-		dobj=create_dobj(32,32),
+		dobj=create_dobj(10,10),
 	}
 	anim={} --animation comtroller
 end
