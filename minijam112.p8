@@ -32,6 +32,9 @@ function _update()
 	t+=1
 	
 	move_cursor()
+	local curs_oy=0
+	if(btn(❎))curs_oy+=1
+	c.dobj.oy=curs_oy
 	
 	update_anim()
 end
@@ -75,6 +78,7 @@ function _draw()
 	if debugmode then 
 		print(debug,1,1,7) --always have last
 		sspr(0,24,8,8,120,120)
+		print("yeah i dunno",1,122,t/3)
 	end
 end
 
