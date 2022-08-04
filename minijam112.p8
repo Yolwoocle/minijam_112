@@ -4,19 +4,22 @@ __lua__
 -- init
 
 function _init()
-	--
+	t=0
 end
+
 -->8
 -- update60
 
 function _update60()
-	--
+	t+=1
 end
 -->8
 -- draw
 
 function _draw()
 	--
+	cls(0)
+	print("yolwoocle is a knob",20,30,t%15)
 end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
