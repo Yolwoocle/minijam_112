@@ -1,6 +1,10 @@
 pico-8 cartridge // http://www.pico-8.com
 version 36
 __lua__
+-- minijam 112:chronos
+
+
+-- main
 
 debug="debug"
 debugmode=false
@@ -10,7 +14,7 @@ function _init()
 	
 	pal({[0]=129,1,12,14,7,140},1)
 	palt(0,false)palt(15,true)
-	poke(0x5f2e,1)
+--	poke(0x5f2e,1)
 	
 	text_parse="ALONZO CORTEZ WILL \nDIE OF A HEART \nATTACK !"
 	parse_length=0
@@ -60,7 +64,7 @@ function draw_bubble()
 	sspr(37,0,7,5,_x+_w+1,_y+4)
 end
 -->8
---
+--potion & ingredients
 -->8
 --
 -->8
