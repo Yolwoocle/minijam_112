@@ -76,7 +76,7 @@ end
 
 
 function parse_dialogue()
-	if(t%5!=0)return
+	if(t%3!=0)return
 	
 	if parse_length<=#text_parse then
 		local append=""
