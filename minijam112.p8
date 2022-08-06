@@ -28,11 +28,18 @@ function _init()
 		ingr_num=0,
 	}
 	
+	cur_fx_dobj={
+		dobj=create_dobj(3,25),
+		target=nil,
+		dx=3,
+		dy=25,
+	}
+
 	bubbles={}
 
 	st=0 --spawn time
 	spawn_wait_time=80
-	conveyor_speed=0.2
+	conveyor_speed=0.3
 
 	ailment_manager=
 	{
@@ -68,6 +75,10 @@ function _update60()
 	for num in all(nums) do
 		if(t%num==0)spawn_bubble() --
 	end
+
+	if dy(cur_fx_dobj.dobj)!=25 and cur_fx_dobj.target==t then
+		anim_to_point(cur_fx_dobj,cur_fx_dobj.dx,cur_fx_dobj.dy)
+	end
 	
 	conveyor_spawner()
 	
@@ -83,10 +94,6 @@ end
 
 function _draw()
 	cls(0)
-	
-	rectfill(-5,-5,135,34,2)
-	draw_pdoctor()
-	draw_bubble()
 	
 
 	draw_pot()
@@ -104,6 +111,11 @@ function _draw()
 	draw_ingr_particles()
 
 	selected_effects()
+
+
+	rectfill(-5,-5,135,34,2)
+	draw_pdoctor()
+	draw_bubble()
 	
 	
 	draw_cursor()
@@ -114,7 +126,7 @@ function _draw()
 	print(parse_output,6,5,5)
 	print(ailment_out,6,5,4)
 	
-	if(debugmode)print(debug,1,1,8)
+	if(debugmode)print(debug,1,1,7)
 end
 
 -->8
@@ -170,6 +182,9 @@ function update_cursor()
 			
 			del(g_ingredients,ingr)
 			commit_ingredient(ingr.obj)
+			cur_fx_dobj.target=t+60
+
+			anim_to_point(cur_fx_dobj,nil,10)
 			
 			c.sel_index=mid(1,c.sel_index,#g_ingredients) --fix cursor
 		end
@@ -265,11 +280,12 @@ function draw_ingredients()
 end
 
 function selected_effects()
+	local _y=dy(cur_fx_dobj.dobj)
 	local ingredient=g_ingredients[c.sel_index]
 	for i=1,#ingredient.obj.effects do
 		local fx=ingredient.obj.effects_modified[i]
-		rrect(2,24+i*13,55,15,1)
-		print(fx,4,25+i*13,2)
+		rrect(2,_y-1+i*13,55,15,1)
+		print(fx,4,_y+i*13,2)
 	end
 end
 
@@ -615,14 +631,17 @@ function new_ailment()
 	pot.ingr={}
 	pot.ingr_num=0
 
+	parse_output=""
+    aliment_out="" 
+
 	--reset dialogue
 	new_dialogue()
 end
 
 --updates the dialogue
 function new_dialogue()
-    parse_length=0
-    parsing=true
+	parse_length=0
+	parsing=true
 
 	local first_name=rnd(first_names)
 	local last_name=rnd(last_names)
@@ -632,24 +651,24 @@ function new_dialogue()
 	local _text=name.." WILL DIE OF "
 	local _ailment=ailment_manager.big_a
 
-    text_parse=to_fit(_text.._ailment.." !",19)
-    ailment=""
-    for i=1,#text_parse do
-        local char=sub(text_parse,i,i)
-        if char=="\n" then
-            ailment..="\n"
-        else
-            if i<#_text+1 or i==#text_parse then
-                ailment..=" "
-            else
-                ailment..=char
-            end
-        end
-    end
-    
+	text_parse=to_fit(_text.._ailment.." !",19)
+	ailment=""
+	for i=1,#text_parse do
+		local char=sub(text_parse,i,i)
+		if char=="\n" then
+			ailment..="\n"
+		else
+			if i<#_text+1 or i==#text_parse then
+				ailment..=" "
+			else
+				ailment..=char
+			end
+		end
+	end
+	
 
-    parse_output=""
-    aliment_out=""    
+	parse_output=""
+	ailment_out=""	
 end
 
 function parse_dialogue()
