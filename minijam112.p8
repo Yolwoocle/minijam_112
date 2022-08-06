@@ -14,9 +14,9 @@ function _init()
 	t=0
 	anim={}
 	
-pal({[0]=129,1,12,14,7,140},1)
-palt(0,false)palt(15,true)
-poke(0x5f2e,1)
+	pal({[0]=129,1,12,14,7,140},1)
+	palt(0,false)palt(15,true)
+	poke(0x5f2e,1)
 	
 	c={
 		dobj=create_dobj(63,63),
@@ -28,7 +28,6 @@ poke(0x5f2e,1)
 	}
 	
 	bubbles={}
-	pot_more_bubbles_t=0
 
 	st=0 --spawn time
 	spawn_wait_time=80
@@ -66,10 +65,8 @@ function _update60()
 	
 	local nums=split"90,103,173,302"
 	for num in all(nums) do
-		if(t%num==0)spawn_bubble()
-		if(pot_more_bubbles_t>0 and t%5==0)spawn_bubble()
+		if(t%num==0)spawn_bubble() --
 	end
-	pot_more_bubbles_t-=1
 	
 	conveyor_spawner()
 	
@@ -104,6 +101,9 @@ function _draw()
 	
 	draw_ingredients()
 	draw_ingr_particles()
+
+	--selected_effects()
+	
 	
 	draw_cursor()
 	
@@ -149,10 +149,28 @@ function update_cursor()
 		anim_to_point(c,dx(ingr.dobj)+ox,dy(ingr.dobj)+oy,0.9)
 	
 		if btnp(❎) and #g_ingredients>1 then
-			add(ingr_particles,new_ingr_particle(dx(ingr.dobj),dy(ingr.dobj),ingr.obj))
+			local a_in={
+				dobj=ingr.dobj,
+				_s=ingr.obj._s,
+				spawn=0,
+				death=60,
+				_tx=10+rnd(22), --22 is middle
+				_ty=70+rnd(5),
+				ox=dx(ingr.dobj),
+				
+				ny=0,
+				vy=-2.5-rnd(),
+				gravity=0.1,
+			} --animation ingredient
+			
+			--anim_to_point(a_in,a_in._tx,a_in._ty,0.95)
+			a_in.dobj.oy=1
+			add(ingr_particles,a_in)
+			
 			del(g_ingredients,ingr)
 			commit_ingredient(ingr.obj)
-			c.sel_index=mid(1,c.sel_index,#g_ingredients)
+			
+			c.sel_index=mid(1,c.sel_index,#g_ingredients) --fix cursor
 		end
 	end
 end
@@ -242,14 +260,15 @@ function draw_ingredients()
 	for ingredient in all(g_ingredients) do
 		local _x,_y=dx(ingredient.dobj), dy(ingredient.dobj)
 		spr(ingredient.obj._s, _x, _y, 2, 2)
-		
-		if ingredient==g_ingredients[c.sel_index] then
-			for i=1,#ingredient.obj.effects do
-				local fx=ingredient.obj.effects_modified[i]
-				rrect(2,24+i*13,55,15,1)
-				print(fx,4,25+i*13,2)
-			end
-		end
+	end
+end
+
+function selected_effects()
+	local ingredient=g_ingredients[c.sel_index]
+	for i=1,#ingredient.obj.effects do
+		local fx=ingredient.obj.effects_modified[i]
+		rrect(2,24+i*13,55,15,1)
+		print(fx,4,25+i*13,2)
 	end
 end
 
@@ -384,6 +403,7 @@ all_solutions={
 	"OLD AGE|LOWERS CHOLESTEROL,HARDENS LIVER",
 }
 
+titles=split"SIR,COUNT,BARON VON,DUCHES,PRINCE,KING,QUEEN"
 first_names=split"HARLAN,EDEN,EARNA,PAIGE,EDOLIE,WINFRED,LINDLEY,GRAHAM,HARLOW,ALLURA,WILTON,NORMA,GREYSEN,OPELINE,CARREEN,TIMOTHEA,EALHSTAN,GIMLI,OSCAR,ROHESIA,OPELINE,LUELLA,HEATH,BRIAR,DEAN"
 last_names=split"GRAHAMES,HUMES,HARFORDE,DARWINE,GOODEE,ELWINE,EDISONE,SWEETE,TATUME,DYRE,BYRD,WEBBE,HEDLEYE,EVERLYE,HARRISE,FAIRBAIRNS,WESTCOTTE,EDGARE"
 
@@ -484,12 +504,18 @@ function anim_to_point(_o,_x,_y,_s)
 end
 
 
-function spawn_bubble()
+function spawn_bubble(_x,_y,_vx,_vy,_gravity)
+	o_vx=0
+	if(_vx!=nil)o_vx=_vx*0.1
+	o_vy=-0.1
+	if(_vy!=nil)o_vy=_vy*0.1
+
 	local new_bub={
-		_x=15+rnd(28),
-		_y=80+rnd(8),
-		vx=0,
-		vy=-0.1,
+		_x= _x or 15+rnd(28),
+		_y= _y or 80+rnd(8),
+		vx= o_vx,
+		vy= o_vy,
+		gravity=_gravity or 0,
 		size=rnd(3)+1,
 	}
 	add(bubbles,new_bub)
@@ -500,38 +526,35 @@ function animate_bubbles()
 		b.size-=rnd(10)*0.01
 		b._x+=b.vx
 		b._y+=b.vy
+		if(b.vx!=nil) b.vx*=0.9
+		if(b.vy!=nil) b.vy*=0.9
+		if(b.gravity!=nil) b.vy+=b.gravity
 		if(b.size<=0)del(bubbles,b)
 	end
 end
 
-function new_ingr_particle(x,y,obj)
-	local p = {
-		spr=obj._s,
-		x=x,
-		orig_x=x,
-		target_x=20,
-		move_t=0,
-		
-		y=y,
-		vy=-4-rnd(2),
-		g=0.2+rnd(0.1),
-
-		rx=rnd{true,false},
-		ry=rnd{true,false},
-	}
-	return p
-end
 
 function animate_ingr_particles()
 	for p in all(ingr_particles) do
-		p.move_t+=1/40
-		p.x=lerp(p.orig_x, p.target_x, p.move_t)
+		p.spawn+=1
+		local amount=p.spawn/p.death --should be a number between 0-1
 		
-		p.vy+=p.g
-		p.y += p.vy
-		if p.vy>0 and p.y>=75 then
+		p.dobj.wx=lerp(p.ox,p._tx,amount) --fix this mess
+		
+		p.vy+=p.gravity
+		p.ny+=p.vy
+
+		p.dobj.oy=p.ny
+		
+		if p.spawn>35 and dy(p.dobj)>80 then
+			local bubble_amount=10
+			local _vx=40
+			local _vy=20
+			for i=0,bubble_amount do
+				spawn_bubble(p._tx+8,p._ty+16,rnd(_vx)-(_vx*0.5),-rnd(_vy),0.01)
+			end
+
 			del(ingr_particles,p)
-			pot_more_bubbles_t = 30
 		end
 
 		if t%5==0 then
@@ -543,7 +566,7 @@ end
 
 function draw_ingr_particles()
 	for p in all(ingr_particles) do
-		spr(p.spr,p.x,p.y,2,2,p.rx,p.ry)
+		spr(p._s,dx(p.dobj),dy(p.dobj),2,2,p.rx,p.ry)
 	end
 end
 
@@ -601,7 +624,10 @@ function new_dialogue()
 
 	local first_name=rnd(first_names)
 	local last_name=rnd(last_names)
-	local _text=first_name.." "..last_name.." WILL DIE OF "
+	local title=""
+	if(flr(rnd(10))==0)title=rnd(titles).." "
+	local name=title..first_name.." "..last_name
+	local _text=name.." WILL DIE OF "
 	local _ailment=ailment_manager.big_a
 
 	text_parse=to_fit(_text.._ailment.." !",19)
@@ -722,19 +748,19 @@ f44444444444444ff44444444444444ff44444444333444ff44444444444444ff44444444444444f
 f34444444444443ff34444444444443ff34444444444443ff34444444444443ff34444444444443ff34444444444443ff34444444444443ff34444444444443f
 ff333333333333ffff333333333333ffff333333333333ffff333333333333ffff333333333333ffff333333333333ffff333333333333ffff333333333333ff
 ff555555555555ffffffffffffffffffff555555555555ffffffffffffffffffff555555555555ffff555555555555ffffffffffffffffffffffffffffffffff
-f55555555555555ffffffffffffffffff55555555555555ffffffffffffffffff55555555555555ff55555555555555fff444444444444ffff444444444444ff
-f555555fff55555fffff6446fffffffff55555555555555ffffffffffffffffff5555dd5dd65555ff5555d3d5555555ff44444444444444ff44444444444444f
-f5555fffffff555fff644ff4ff46fffff55554dd4455555fffffffff44fffffff555dd64d44d555ff55553335555555ff44444444444444ff44444444444444f
-f554fffffffff55fff44ffff446ffffff555444dd445555ffffffff4444ffffff555d6444444555ff5555d335555555ff44444444444444ff44444444444444f
-f55a44ffffff955fff44fffffffffffff5554444d445555fffff4464444ffffff555d4444444555ff5555533d555555ff44444444444444ff44444444444444f
-f55aaa44ff99955fff44fff64446fffff5554444d445555ffff4446433464ffff555d4444444555ff55555333555555ff44444444444444ff44444444444444f
-f55aaaa49999955fff444f6444446ffff555d444d445555ffff4444333344ffff5555644444d555ff55555d33555555ff44444444444444ff44444444444444f
-f55aaaa49999555ffff4464443344ffff555d444d445555fffff443333344ffff5555d44d645555ff55555535855555ff44444444444444ff44444444444444f
-f555aaa49995555fffff464533335ffff5555d4444d5555fffff463333444ffff5555d4d5d65555ff55555585588155ff44444444444444ff44444444444444f
-f55555a49555555fffffff5533335ffff55555d44d55555fffff64433644fffff555556555d5555ff55555581555555ff44444444444444ff44444444444444f
-f55555555555555fffffff6443346ffff55555555555555fffff44444644fffff55555d555d5555ff55555558115555ff44444444444444ff44444444444444f
-f55555555555555ffffffff64446fffff55555555555555ffffff444446ffffff55555555555555ff55555555555555ff44444444444444ff44444444444444f
-f15555555555551ffffffffffffffffff15555555555551ffffffffffffffffff15555555555551ff15555555555551ff44444444444444ff44444444444444f
+f55555555555555fffff0000fffffffff55555555555555ffffffffffffffffff55555555555555ff55555555555555fff444444444444ffff444444444444ff
+f555555fff55555fff0064460f00fffff55555555555555fffffffff00fffffff5555dd5dd65555ff5555d3d5555555ff44444444444444ff44444444444444f
+f5555fffffff555ff064400400460ffff55554dd4455555ffffffff0440ffffff555dd64d44d555ff55553335555555ff44444444444444ff44444444444444f
+f554fffffffff55ff0440ff04460fffff555444dd445555fffff00044440fffff555d6444444555ff5555d335555555ff44444444444444ff44444444444444f
+f55a44ffffff955ff0440ff00000fffff5554444d445555ffff0446444400ffff555d4444444555ff5555533d555555ff44444444444444ff44444444444444f
+f55aaa44ff99955ff0440f0644460ffff5554444d445555fff044464334640fff555d4444444555ff55555333555555ff44444444444444ff44444444444444f
+f55aaaa49999955ff0444064444460fff555d444d445555fff044443333440fff5555644444d555ff55555d33555555ff44444444444444ff44444444444444f
+f55aaaa49999555fff044644433440fff555d444d445555ffff04433333440fff5555d44d645555ff55555535855555ff44444444444444ff44444444444444f
+f555aaa49995555ffff04645333350fff5555d4444d5555ffff04633334440fff5555d4d5d65555ff55555585588155ff44444444444444ff44444444444444f
+f55555a49555555fffff0055333350fff55555d44d55555ffff0644336440ffff555556555d5555ff55555581555555ff44444444444444ff44444444444444f
+f55555555555555ffffff064433460fff55555555555555ffff0444446440ffff55555d555d5555ff55555558115555ff44444444444444ff44444444444444f
+f55555555555555fffffff0644460ffff55555555555555fffff04444460fffff55555555555555ff55555555555555ff44444444444444ff44444444444444f
+f15555555555551ffffffff00000fffff15555555555551ffffff000000ffffff15555555555551ff15555555555551ff44444444444444ff44444444444444f
 f51111111111115ffffffffffffffffff51111111111115ffffffffffffffffff51111111111115ff51111111111115ff34444444444443ff34444444444443f
 ff555555555555ffffffffffffffffffff555555555555ffffffffffffffffffff555555555555ffff555555555555ffff333333333333ffff333333333333ff
 222211122222222200000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffff22222222000000
