@@ -20,17 +20,15 @@ function _init()
 	poke(0x5f2e,1)
 	
 	--screen shake
-	offset=0
-	cam_y_offset=0
-	cam_y_max=25
-	cam_y_anim=0
-	cam_y_active=false
+	shake=0
 	
 	c={
 		dobj=create_dobj(63,63),
 		sel_index=1,
 		mode="ingredients"
 	}
+
+	ticks={false,false,false}
 	time_since_last=0
 	dialogue_queue=""
 	dialogue_queue_time=0
@@ -42,6 +40,7 @@ function _init()
 		_y=90,
 		name=rnd(potion_types),
 		score=0,
+		points={}
 	}
 	
 	cur_fx_dobj={
@@ -49,6 +48,11 @@ function _init()
 		target=nil,
 		dx=3,
 		dy=25,
+	}
+
+	potion={
+		dobj=create_dobj(50,0),
+		target_y=40,
 	}
 
 	bubbles={}
@@ -68,6 +72,8 @@ function _init()
 
 	past_customers={}
 
+
+	parse_speed=5
 	text_parse=""
 	ailment=""
 	parse_length=0
@@ -90,16 +96,16 @@ end
 
 function _update60()
 	t+=1
-	st+=1
+	if(conveyor_active)st+=1 --only iterate spawn timer is the conveyor is active
 	time_since_last+=1
 
 
 	if dialogue_queue!="" and time_since_last>dialogue_queue_time then
 		new_dialogue(unpack(dialogue_queue))
+		dialogue_queue=""
 	end
 
-	conveyor_speed=conveyor_speed_original
-	if(not conveyor_active)conveyor_speed=0
+	animate_score_mode()
 
 	local nums=split"90,103,173,302"
 	for num in all(nums) do
@@ -142,9 +148,9 @@ function _draw()
 	draw_ingr_particles()
 	
 	local _text="potion of"
-	local _y=
-	text_bold2(_text,hcentre(_text)-35,pot._y-51,4,5)
-	text_bold2(pot.name,hcentre(pot.name)-35,pot._y-44,4,5)
+	local _y=dy(potion.dobj)
+	text_bold2(_text,hcentre(_text)-35,_y,4,5)
+	text_bold2(pot.name,hcentre(pot.name)-35,_y+7,4,5)
 
 	selected_effects()
 
@@ -152,6 +158,8 @@ function _draw()
 	rectfill(-5,-5,135,34,2)
 	draw_pdoctor()
 	draw_bubble()
+
+	draw_ticks()
 	
 	
 	draw_cursor()
@@ -167,6 +175,13 @@ end
 
 -->8
 --update
+
+function return_to_belt()
+	c.mode="ingredients"
+	conveyor_active=true
+	ticks={false,false,false}
+	new_ailment()
+end
 
 function animate_ingredients()
 	for ingredient in all(g_ingredients) do
@@ -237,10 +252,8 @@ function update_cursor()
 			end
 		end
 	elseif c.mode=="pot" then
-		if btnp(❎) then
-			c.mode="ingredients"
-			conveyor_active=true
-			new_ailment()
+		if btnp(❎) and time_since_last>300 then
+			return_to_belt()
 		end
 	end
 end
@@ -248,7 +261,7 @@ end
 --spawns objects onto the
 --conveyor
 function conveyor_spawner()
-	if st%spawn_wait_time==0 then
+	if st%spawn_wait_time==0 and conveyor_active then
 		local object={
 			obj=generate_ingredient(),
 			dobj=create_dobj(-20,95+rnd(10))
@@ -266,17 +279,20 @@ function commit_ingredient(_ingr)
 
 	i=1
 
-	local points=flr(rnd(10))-6
+	local points=flr(rnd(6))-4
 	for _fx in all(_ingr.effects) do
 		if in_list(ailment_manager.solutions,_fx) then
 			effect=_ingr.effects_modified[i]
-			points+=flr(rnd(10))
+			points=flr(rnd(5))+5
 		end
 		i+=1
 	end
 	if(not effect)effect=rnd(_ingr.effects_modified)
+
+	add(pot.points,points)
 	add(pot.ingr,effect)
 	pot.ingr_num+=1
+
 
 	pot.score+=points
 
@@ -293,8 +309,10 @@ function commit_ingredient(_ingr)
 		--check scores and create new dialogue
 		if(pot.score>5) then adjectives=positive_adj else adjectives=negative_adj end
 		if(flr(rnd(10))==0)adjectives=neutral_adj
-		--local next_dialogue=pack({})
-		new_dialogue(format[1]..ailment_manager.customer.." "..format[2].." ",rnd(adjectives),format[3])
+		
+		--set up dialogue queue
+		dialogue_queue=pack(format[1]..ailment_manager.customer.." "..format[2].." ",rnd(adjectives),format[3])
+		dialogue_queue_time=120
 
 		--add customer to past_customers list
 		add(past_customers,{name=ailment_manager.customer,score=pot.score,cause=ailment_manager.big_a})
@@ -327,6 +345,16 @@ function draw_pdoctor()
 	pset(_x+18,_y+27,4)
 end
 
+function draw_ticks()
+	local _x,_y=80,40
+	for i=1,3 do
+		if ticks[i] then
+			local text=pot.points[i] or "0"
+			if text>=0 then text="+"..text end
+			text_bold(text,_x,_y+i*15,7,1)
+		end
+	end
+end
 
 --draw speech bubble
 function draw_bubble()
@@ -344,7 +372,7 @@ end
 function draw_conveyor()
 	local _y=105
 	for i=0,10 do
-		local _x=-20+(i*16)+(t*conveyor_speed)%16
+		local _x=-20+(i*16)+(st*conveyor_speed)%16
 		sspr(0,64,16,16,_x,_y)
 	end
 	line(-5,_y+15,130,_y+15,3)
@@ -369,8 +397,28 @@ function selected_effects()
 	for i=1,#ingredient.obj.effects do
 		local fx=ingredient.obj.effects_modified[i]
 		rrect(2,_y-1+i*13,55,15,1)
-		print(fx,4,_y+i*13,2)
+		print(fx,4,_y+i*13,4)
 	end
+end
+
+function animate_score_mode()
+	conveyor_speed=conveyor_speed_original
+	if(not conveyor_active)conveyor_speed=0
+
+	if(c.mode!="pot")return 
+
+	if(time_since_last>30)anim_to_point(potion,30,potion.target_y)
+
+	--when the secondary text is finished writing
+	local text_finish_time=#text_parse*parse_speed+120
+	for i=1,3 do
+		if time_since_last==30+text_finish_time+i*23 then
+			shake=0.07
+			ticks[i]=true
+		end
+	end
+
+	if(time_since_last>text_finish_time+250)return_to_belt()
 end
 
 
@@ -433,8 +481,8 @@ function generate_ingredient()
 		end
 	end
 	
-	spawn_wait_time=80+flr(rnd(100))
-	st=0
+	spawn_wait_time=st+flr(rnd(100))+20
+	--st=0
 
 	return gen_ingr
 end
@@ -569,7 +617,7 @@ function animate_ingr_particles()
 
 			del(ingr_particles,p)
 
-			offset=0.07
+			shake=0.07
 		end
 
 		if t%5==0 then
@@ -629,6 +677,7 @@ function new_ailment()
 	pot.ingr={}
 	pot.ingr_num=0
 	pot.score=0
+	pot.points={}
 
 	parse_output=""
     aliment_out="" 
@@ -681,7 +730,7 @@ function new_dialogue(_text,_text_bold,_end)
 end
 
 function parse_dialogue()
-	if(t%5!=0)return
+	if(t%parse_speed!=0)return
 	
 	if parse_length<=#text_parse then
 		local sfx_list={63,63,62}
@@ -739,13 +788,13 @@ function screen_shake()
   local fade = 0.95
   local offset_x=16-rnd(32)
   local offset_y=16-rnd(32)
-  offset_x*=offset
-  offset_y*=offset
+  offset_x*=shake
+  offset_y*=shake
   
-  camera(offset_x,offset_y+cam_y_offset)
-  offset*=fade
-  if offset<0.05 then
-    offset=0
+  camera(offset_x,offset_y)
+  shake*=fade
+  if shake<0.05 then
+    shake=0
   end
 end
 
@@ -780,7 +829,7 @@ end
 -->8
 --data
 
-all_effects=split"LOWERS CHOLESTEROL,INCREASES MEMORY,REDUCES MEMORY LOSS,STRENGTHENS BONE MARROW,INCREASES CHARISMA,REJUVENATES HAIR GROWTH,FACILITATES CONFIDENCE,HARDENS SKIN,HIGH IN VITAMIN C,BREAKS FOURTH WALL,INCREASES PUNGENCY,UNTERRICHTET dEUTSCH,FINDS KEYS,GIVES A FEVER,HARDENS LIVER,DRIES MOUTH,INDUCES VOMITING,REMOVES TASTE,INCREASE COORDINATION,TURNS URINE GREEN,AMPLIFIES TINNITUS,EMITS 5G SIGNAL,BOOSTS TASTE,TASTES OF ORANGE,JUST GETS YOU STONED,INCREASES STRENGTH,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STEALTH,RAISES HP,RAISES MP,RAISES SPEED,INCREASES INTELLIGENCE,LOWERS INTELLIGENCE,LOWERS SPEED,LOWERS HP,DECREASES STEALTH,DECREASES MAGIC,DECREASES STRENGTH,DECREASES DEXTERITY,INCREASES CONSTITUTION,DECREASES CONSTITUTION,INCREASES WISDOM,DECREASES WISDOM,RAISES RECOVERY,INSTILLS PARANOIA,PROBABLY BOOSTS LUCK,FREAKS EVERYONE OUT,INCREASES POISON RES,INCREASES FIRE RES,LOWERS FIRE RES,LOWERS POISON RES,RAISES GLASS CEILING,INSTANT DEATH,RAISES SEX APPEAL,RELEASES PHEROMONES,THICKENS BLOOD,INDUCES STRESS,INDUCES MANIA,INDUCES VOMITING,CURES HANGOVER"
+all_effects=split"LOWERS CHOLESTEROL,INCREASES MEMORY,REDUCES MEMORY LOSS,STRENGTHENS BONE MARROW,INCREASES CHARISMA,REJUVENATES HAIR GROWTH,FACILITATES CONFIDENCE,HARDENS SKIN,HIGH IN VITAMIN C,BREAKS FOURTH WALL,INCREASES PUNGENCY,UNTERRICHTET dEUTSCH,FINDS KEYS,GIVES A FEVER,HARDENS LIVER,DRIES MOUTH,INDUCES VOMITING,REMOVES TASTE,INCREASE COORDINATION,TURNS URINE GREEN,AMPLIFIES TINNITUS,EMITS 5G SIGNAL,BOOSTS TASTE,TASTES OF ORANGE,JUST GETS YOU STONED,INCREASES STRENGTH,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STEALTH,RAISES HIT POINTS,RAISES MAGIC POINTS,RAISES SPEED,INCREASES INTELLIGENCE,LOWERS INTELLIGENCE,LOWERS SPEED,LOWERS HP,DECREASES STEALTH,DECREASES MAGIC,DECREASES STRENGTH,DECREASES DEXTERITY,INCREASES CONSTITUTION,DECREASES CONSTITUTION,INCREASES WISDOM,DECREASES WISDOM,RAISES RECOVERY,INSTILLS PARANOIA,PROBABLY BOOSTS LUCK,FREAKS EVERYONE OUT,INCREASES POISON RES,INCREASES FIRE RES,LOWERS FIRE RES,LOWERS POISON RES,RAISES GLASS CEILING,INSTANT DEATH,RAISES SEX APPEAL,RELEASES PHEROMONES,THICKENS BLOOD,INDUCES STRESS,INDUCES MANIA,INDUCES VOMITING,CURES HANGOVER"
 all_solutions={
 	"A BROKEN HEART|LOWERS CHOLESTEROL,RAISES SEX APPEAL,RELEASES PHEROMONES,FACILITATES CONFIDENCE,HARDENS SKIN",
 	"BAD BODY ODOUR|RELEASES PHEROMONES",
