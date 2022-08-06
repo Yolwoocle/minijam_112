@@ -7,7 +7,7 @@ __lua__
 -- main
 
 debug="debug"
-debugmode=false
+debugmode=true
 
 sound_on=true
 
@@ -23,8 +23,13 @@ function _init()
 		dobj=create_dobj(63,63),
 		sel_index=1,
 	}
-	c.dobj.ox=12
-	c.dobj.oy=6
+	pot={
+		ingr={},
+		ingr_num=0,
+	}
+
+	st=0 --spawn time
+	spawn_wait_time=80
 
 	text_parse=""
 	ailment=""
@@ -37,42 +42,21 @@ function _init()
 	g_ingredients={
 		{
 			obj=ingredients.candy,
-			dobj=create_dobj(-80,rnd(10)+90)
-		},
-		{
-			obj=ingredients.candy,
-			dobj=create_dobj(-52,rnd(10)+90)
-		},
-		{
-			obj=ingredients.candy,
-			dobj=create_dobj(-30,rnd(10)+90)
-		},
-		{
-			obj=ingredients.candy,
-			dobj=create_dobj(-10,rnd(10)+90)
+			dobj=create_dobj(-0,rnd(10)+90)
 		},
 	}
 end
 
 function _update60()
 	t+=1
+	st+=1
 	
-	if btnp(⬅️) then
-		c.sel_index=max(c.sel_index-1, 1)
-		sfx(61)
-	end
-	if btnp(➡️) then
-		c.sel_index=min(c.sel_index+1, #g_ingredients)
-		sfx(61)
-	end
-	-- Animate to target
-	local dobj = g_ingredients[c.sel_index].dobj
-	anim_to_point(c, dx(dobj), dy(dobj), 0.8)
-
-	for ingredient in all(g_ingredients) do
-		local speed=0.2
-		ingredient.dobj.wx+=speed
-	end
+	-- animate to target
+	
+	conveyor_spawner()
+	
+	update_cursor()
+	animate_ingredients()
 	
 	parse_dialogue()
 	update_anim()
@@ -85,6 +69,9 @@ function _draw()
 	draw_pdoctor()
 	draw_bubble()
 	draw_conveyor()
+	
+	draw_effects()
+	
 	draw_ingredients()
 	
 	draw_cursor()
@@ -98,6 +85,51 @@ end
 
 -->8
 --update
+
+function animate_ingredients()
+	for ingredient in all(g_ingredients) do
+		local speed=0.2
+		ingredient.dobj.wx+=speed
+		
+		--destroy ingredient if it goes off screen
+		if ingredient.dobj.wx>128 then
+			del(g_ingredients,ingredient)
+			c.sel_index=mid(1,c.sel_index-1,#g_ingredients) --fix weird cursor thing
+		end
+	end
+end
+
+
+function update_cursor()
+	for i=0,1 do --move cursor direction from input
+		if btnp(i) then
+			sfx(61)
+			local dir=split"1,-1"
+			c.sel_index=mid(1,c.sel_index+dir[i+1],#g_ingredients)
+		end
+	end
+
+
+	if #g_ingredients>0 then --animate to selected ingredient location
+		local ox,oy=10,8
+		local ingr=g_ingredients[c.sel_index]
+		anim_to_point(c,dx(ingr.dobj)+ox,dy(ingr.dobj)+oy,0.9)
+	end
+end
+
+--spawns objects onto the
+--conveyor
+function conveyor_spawner()
+	if st%spawn_wait_time==0 then
+		local object={
+			obj=ingredients.candy,
+			dobj=create_dobj(-20,95+rnd(10))
+		}
+		add(g_ingredients,object)
+		spawn_wait_time=80+flr(rnd(100))
+		st=0
+	end
+end
 -->8
 --draw
 
@@ -142,8 +174,26 @@ end
 
 function draw_ingredients()
 	for ingredient in all(g_ingredients) do
-		spr(ingredient.obj.spr, dx(ingredient.dobj), dy(ingredient.dobj), 2, 2)
+		spr(ingredient.obj._s, flr(dx(ingredient.dobj)), flr(dy(ingredient.dobj)), 2, 2)
 	end
+end
+
+
+function draw_effects()
+	local _x,_y=61,39
+	local _w,_h=62,60
+	
+	rrect(_x,_y,_w,_h,3)
+	
+	print("effects",_x+3,_y+3,5)
+	line(_x+4,_y+10,_x+_w-4,_y+10)
+	
+	local default_text="EMPTY \n INGREDIENT"	
+	for i=0,2 do
+		local text=pot[i+1] or default_text
+		print(default_text,_x+4,_y+14+i*14,4)
+	end
+	
 end
 
 
@@ -424,8 +474,8 @@ f555aaa49995555ff55555113333155ff5555d4444d5555ff55522255555555ff5555d4d5d65555f
 f55555a49555555ff55555244334255ff55555d44d55555ff55222555555555ff555556555d5555ff55555581555555f00000000000000000000000000000000
 f55555555555555ff55555524442555ff55555555555555ff55225555555555ff55555d555d5555ff55555558115555f00000000000000000000000000000000
 f55555555555555ff55555555555555ff55555555555555ff55555555555555ff55555555555555ff55555555555555f00000000000000000000000000000000
-ff555555555555ffff555555555555ffff555555555555ffff555555555555ffff555555555555ffff555555555555ff00000000000000000000000000000000
-f5ffffffffffff5ff5ffffffffffff5ff5ffffffffffff5ff5ffffffffffff5ff5ffffffffffff5ff5ffffffffffff5f00000000000000000000000000000000
+f15555555555551ff15555555555551ff15555555555551ff15555555555551ff15555555555551ff15555555555551f00000000000000000000000000000000
+f51111111111115ff51111111111115ff51111111111115ff51111111111115ff51111111111115ff51111111111115f00000000000000000000000000000000
 ff555555555555ffff555555555555ffff555555555555ffff555555555555ffff555555555555ffff555555555555ff00000000000000000000000000000000
 22221112222222220055555555555500005555555555550000555555555555000055555555555500000000000000000000000000000000000000000000000000
 55552221555555550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
