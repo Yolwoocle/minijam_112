@@ -1,7 +1,8 @@
 pico-8 cartridge // http://www.pico-8.com
 version 36
 __lua__
--- minijam 112:chronos
+-- minijam 112: chronos
+-- louiechapm & yolwoocle
 
 -- main
 
