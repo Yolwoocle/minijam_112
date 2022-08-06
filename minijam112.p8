@@ -267,7 +267,7 @@ function draw_effects()
 	line(_x+(_w*0.5)-1,_y+11,_x+(_w*0.5)+1,_y+11,5)
 	line(_x+(_w*0.5),_y+8,_x+(_w*0.5),_y+12,5)
 	
-	local default_text="EMPTY \n INGREDIENT"	
+	local default_text="[EMPTY] \n"	
 	for i=0,2 do
 		local text=pot.ingr[i+1] or default_text
 		print(text,_x+4,_y+14+i*14,4)
@@ -384,6 +384,7 @@ all_solutions={
 	"OLD AGE|LOWERS CHOLESTEROL,HARDENS LIVER",
 }
 
+titles=split"SIR,COUNT,BARON VON,DUCHES,PRINCE,KING,QUEEN"
 first_names=split"HARLAN,EDEN,EARNA,PAIGE,EDOLIE,WINFRED,LINDLEY,GRAHAM,HARLOW,ALLURA,WILTON,NORMA,GREYSEN,OPELINE,CARREEN,TIMOTHEA,EALHSTAN,GIMLI,OSCAR,ROHESIA,OPELINE,LUELLA,HEATH,BRIAR,DEAN"
 last_names=split"GRAHAMES,HUMES,HARFORDE,DARWINE,GOODEE,ELWINE,EDISONE,SWEETE,TATUME,DYRE,BYRD,WEBBE,HEDLEYE,EVERLYE,HARRISE,FAIRBAIRNS,WESTCOTTE,EDGARE"
 
@@ -596,32 +597,35 @@ end
 
 --updates the dialogue
 function new_dialogue()
-	parse_length=0
-	parsing=true
+    parse_length=0
+    parsing=true
 
-	local first_name=rnd(first_names)
-	local last_name=rnd(last_names)
-	local _text=first_name.." "..last_name.." WILL DIE OF "
-	local _ailment=ailment_manager.big_a
+    local first_name=rnd(first_names)
+    local last_name=rnd(last_names)
+    local title=""
+    if(flr(rnd(10))==0)title=rnd(titles).." "
+    local name=title..first_name.." "..last_name
+    local _text=name.." WILL DIE OF "
+    local _ailment=ailment_manager.big_a
 
-	text_parse=to_fit(_text.._ailment.." !",19)
-	ailment=""
-	for i=1,#text_parse do
-		local char=sub(text_parse,i,i)
-		if char=="\n" then
-			ailment..="\n"
-		else
-			if i<#_text+1 or i==#text_parse then
-				ailment..=" "
-			else
-				ailment..=char
-			end
-		end
-	end
-	
+    text_parse=to_fit(_text.._ailment.." !",19)
+    ailment=""
+    for i=1,#text_parse do
+        local char=sub(text_parse,i,i)
+        if char=="\n" then
+            ailment..="\n"
+        else
+            if i<#_text+1 or i==#text_parse then
+                ailment..=" "
+            else
+                ailment..=char
+            end
+        end
+    end
+    
 
-	parse_output=""
-	ailment_out=""	
+    parse_output=""
+    aliment_out=""    
 end
 
 function parse_dialogue()
