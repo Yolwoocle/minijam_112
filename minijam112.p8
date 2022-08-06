@@ -84,6 +84,8 @@ function _init()
 
 	ingr_particles={}
 
+	doctor_oy = 0
+
 	new_ailment()
 
 	g_ingredients={
@@ -114,6 +116,13 @@ function _update60()
 
 	if dy(cur_fx_dobj.dobj)!=25 and cur_fx_dobj.target==t and c.mode=="ingredients" then
 		anim_to_point(cur_fx_dobj,cur_fx_dobj.dx,cur_fx_dobj.dy)
+	end
+
+	-- update doctor bop
+	doctor_oy=lerp(doctor_oy,0,0.5)
+	if(abs(doctor_oy)<0.1)doctor_oy=0
+	if parsing and t%5==0 then
+		doctor_oy=-2
 	end
 	
 	conveyor_spawner()
@@ -334,15 +343,17 @@ end
 --draw plague doctor
 function draw_pdoctor()
 	local _x,_y=89,8
+	local oy=doctor_oy
+
 	if parsing then
-		sspr(88,0,36,27,_x+2,_y)
+		sspr(88,0,36,27,_x+2,_y+oy)
 	else
-		sspr(0,0,36,27,_x,_y)
+		sspr(0,0,36,27,_x,_y+oy)
 	end
-	pset(_x+19,_y+27,4)
-	pset(_x+19,_y+28,4)
-	pset(_x+20,_y+27,4)
-	pset(_x+18,_y+27,4)
+	pset(_x+19,_y+27+oy,4)
+	pset(_x+19,_y+28+oy,4)
+	pset(_x+20,_y+27+oy,4)
+	pset(_x+18,_y+27+oy,4)
 end
 
 function draw_ticks()
@@ -921,10 +932,10 @@ ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 fffffffffffffffffffff000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0fffffff
 ffffff0000ffffffffff02250ffffffffffffff0000fffffffffffffffffffffffff000000fffffffffff0000fffffffffffffff0ffffffffffffff040ffffff
 fffff033440ffffffff022220fffffffffff00064460fffffffffffffffffffffff03355550fffffffff0d33d0fffffffffff0f0f000ffffffffff03440fffff
-ffff03000330fffffff025520ffffffffff064444420fffffffffff00ffffffffff033355330fffffff0d3d44d0fffffffffff0500330fffff000f033440ffff
-fff000fff0330fffffff055220fffffffff044200600ffffffffff0420ffffffff0553300000fffffff03d3d4000fffffffff00204330fffff0440333330ffff
-fff0fffff0430fffffff022550ffffffffff000264640ffffffff062250fffffff05000666660ffffff0d3d330250fffffff040250440fffff034033344000ff
-ffffffff06430ffffffff0252200fffffff02464644640fffffff022240fffffff00666640660ffffff00dd0052250fffff034402040ffffff043403340340ff
+ffff03000330fffffff025520ffffffffff0644444d0fffffffffff00ffffffffff033355330fffffff0d3d44d0fffffffffff0500330fffff000f033440ffff
+fff000fff0330fffffff055220fffffffff044600600ffffffffff0420ffffffff0553300000fffffff03d3d4000fffffffff00204330fffff0440333330ffff
+fff0fffff0430fffffff022550ffffffffff000d64640ffffffff062250fffffff05000666660ffffff0d3d330250fffffff040250440fffff034033344000ff
+ffffffff06430ffffffff0252200fffffff0d464644640fffffff022240fffffff00666640660ffffff00dd0052250fffff034402040ffffff043403340340ff
 ffff000033440ffffffff002255200fffff044644646460fffff02224440ffffff0666044000ffffff050301022220fffff0334020330ffffff03403440d30ff
 fff0064433460fffffff02525225440fff0446444644640fffff02224440fffffff0000440ffffffff020d05022220ffffff004052030ffffff04303440d0fff
 ff0d30433340fffffff040220502060fff0446444644640fffff02222440ffffffffff04460fffffff05200505220ffffffff04302040fffffff030440d0ffff
