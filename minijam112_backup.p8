@@ -14,9 +14,9 @@ function _init()
 	t=0
 	anim={}
 	
-	pal({[0]=129,1,12,14,7,140},1)
-	palt(0,false)palt(15,true)
-	poke(0x5f2e,1)
+pal({[0]=129,1,12,14,7,140},1)
+palt(0,false)palt(15,true)
+poke(0x5f2e,1)
 	
 	c={
 		dobj=create_dobj(63,63),
