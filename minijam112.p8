@@ -28,11 +28,18 @@ function _init()
 		ingr_num=0,
 	}
 	
+	cur_fx_dobj={
+		dobj=create_dobj(3,25),
+		target=nil,
+		dx=3,
+		dy=25,
+	}
+
 	bubbles={}
 
 	st=0 --spawn time
 	spawn_wait_time=80
-	conveyor_speed=0.2
+	conveyor_speed=0.3
 
 	ailment_manager=
 	{
@@ -49,6 +56,8 @@ function _init()
 	ailment_out=""
 
 	ingr_particles={}
+
+	doctor_oy = 0
 
 	new_ailment()
 
@@ -68,6 +77,17 @@ function _update60()
 	for num in all(nums) do
 		if(t%num==0)spawn_bubble() --
 	end
+
+	if dy(cur_fx_dobj.dobj)!=25 and cur_fx_dobj.target==t then
+		anim_to_point(cur_fx_dobj,cur_fx_dobj.dx,cur_fx_dobj.dy)
+	end
+
+	-- update doctor bop
+	doctor_oy=lerp(doctor_oy,0,0.5)
+	if(abs(doctor_oy)<0.1)doctor_oy=0
+	if parsing and t%5==0 then
+		doctor_oy=-2
+	end
 	
 	conveyor_spawner()
 	
@@ -83,10 +103,6 @@ end
 
 function _draw()
 	cls(0)
-	
-	rectfill(-5,-5,135,34,2)
-	draw_pdoctor()
-	draw_bubble()
 	
 
 	draw_pot()
@@ -104,6 +120,11 @@ function _draw()
 	draw_ingr_particles()
 
 	selected_effects()
+
+
+	rectfill(-5,-5,135,34,2)
+	draw_pdoctor()
+	draw_bubble()
 	
 	
 	draw_cursor()
@@ -114,7 +135,7 @@ function _draw()
 	print(parse_output,6,5,5)
 	print(ailment_out,6,5,4)
 	
-	if(debugmode)print(debug,1,1,8)
+	if(debugmode)print(debug,1,1,7)
 end
 
 -->8
@@ -170,6 +191,9 @@ function update_cursor()
 			
 			del(g_ingredients,ingr)
 			commit_ingredient(ingr.obj)
+			cur_fx_dobj.target=t+60
+
+			anim_to_point(cur_fx_dobj,nil,10)
 			
 			c.sel_index=mid(1,c.sel_index,#g_ingredients) --fix cursor
 		end
@@ -217,15 +241,17 @@ end
 --draw plague doctor
 function draw_pdoctor()
 	local _x,_y=89,8
+	local oy=doctor_oy
+
 	if parsing then
-		sspr(88,0,36,27,_x+2,_y)
+		sspr(88,0,36,27,_x+2,_y+oy)
 	else
-		sspr(0,0,36,27,_x,_y)
+		sspr(0,0,36,27,_x,_y+oy)
 	end
-	pset(_x+19,_y+27,4)
-	pset(_x+19,_y+28,4)
-	pset(_x+20,_y+27,4)
-	pset(_x+18,_y+27,4)
+	pset(_x+19,_y+27+oy,4)
+	pset(_x+19,_y+28+oy,4)
+	pset(_x+20,_y+27+oy,4)
+	pset(_x+18,_y+27+oy,4)
 end
 
 
@@ -265,11 +291,12 @@ function draw_ingredients()
 end
 
 function selected_effects()
+	local _y=dy(cur_fx_dobj.dobj)
 	local ingredient=g_ingredients[c.sel_index]
 	for i=1,#ingredient.obj.effects do
 		local fx=ingredient.obj.effects_modified[i]
-		rrect(2,24+i*13,55,15,1)
-		print(fx,4,25+i*13,2)
+		rrect(2,_y-1+i*13,55,15,1)
+		print(fx,4,_y+i*13,2)
 	end
 end
 
@@ -615,14 +642,17 @@ function new_ailment()
 	pot.ingr={}
 	pot.ingr_num=0
 
+	parse_output=""
+    aliment_out="" 
+
 	--reset dialogue
 	new_dialogue()
 end
 
 --updates the dialogue
 function new_dialogue()
-    parse_length=0
-    parsing=true
+	parse_length=0
+	parsing=true
 
 	local first_name=rnd(first_names)
 	local last_name=rnd(last_names)
@@ -632,24 +662,24 @@ function new_dialogue()
 	local _text=name.." WILL DIE OF "
 	local _ailment=ailment_manager.big_a
 
-    text_parse=to_fit(_text.._ailment.." !",19)
-    ailment=""
-    for i=1,#text_parse do
-        local char=sub(text_parse,i,i)
-        if char=="\n" then
-            ailment..="\n"
-        else
-            if i<#_text+1 or i==#text_parse then
-                ailment..=" "
-            else
-                ailment..=char
-            end
-        end
-    end
-    
+	text_parse=to_fit(_text.._ailment.." !",19)
+	ailment=""
+	for i=1,#text_parse do
+		local char=sub(text_parse,i,i)
+		if char=="\n" then
+			ailment..="\n"
+		else
+			if i<#_text+1 or i==#text_parse then
+				ailment..=" "
+			else
+				ailment..=char
+			end
+		end
+	end
+	
 
-    parse_output=""
-    aliment_out=""    
+	parse_output=""
+	ailment_out=""	
 end
 
 function parse_dialogue()
@@ -737,10 +767,10 @@ ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 fffffffffffffffffffff000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0fffffff
 ffffff0000ffffffffff02250ffffffffffffff0000fffffffffffffffffffffffff000000fffffffffff0000fffffffffffffff0ffffffffffffff040ffffff
 fffff033440ffffffff022220fffffffffff00064460fffffffffffffffffffffff03355550fffffffff0d33d0fffffffffff0f0f000ffffffffff03440fffff
-ffff03000330fffffff025520ffffffffff064444420fffffffffff00ffffffffff033355330fffffff0d3d44d0fffffffffff0500330fffff000f033440ffff
-fff000fff0330fffffff055220fffffffff044200600ffffffffff0420ffffffff0553300000fffffff03d3d4000fffffffff00204330fffff0440333330ffff
-fff0fffff0430fffffff022550ffffffffff000264640ffffffff062250fffffff05000666660ffffff0d3d330250fffffff040250440fffff034033344000ff
-ffffffff06430ffffffff0252200fffffff02464644640fffffff022240fffffff00666640660ffffff00dd0052250fffff034402040ffffff043403340340ff
+ffff03000330fffffff025520ffffffffff0644444d0fffffffffff00ffffffffff033355330fffffff0d3d44d0fffffffffff0500330fffff000f033440ffff
+fff000fff0330fffffff055220fffffffff044600600ffffffffff0420ffffffff0553300000fffffff03d3d4000fffffffff00204330fffff0440333330ffff
+fff0fffff0430fffffff022550ffffffffff000d64640ffffffff062250fffffff05000666660ffffff0d3d330250fffffff040250440fffff034033344000ff
+ffffffff06430ffffffff0252200fffffff0d464644640fffffff022240fffffff00666640660ffffff00dd0052250fffff034402040ffffff043403340340ff
 ffff000033440ffffffff002255200fffff044644646460fffff02224440ffffff0666044000ffffff050301022220fffff0334020330ffffff03403440d30ff
 fff0064433460fffffff02525225440fff0446444644640fffff02224440fffffff0000440ffffffff020d05022220ffffff004052030ffffff04303440d0fff
 ff0d30433340fffffff040220502060fff0446444644640fffff02222440ffffffffff04460fffffff05200505220ffffffff04302040fffffff030440d0ffff
