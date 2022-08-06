@@ -122,7 +122,7 @@ function _update60()
 	doctor_oy=lerp(doctor_oy,0,0.5)
 	if(abs(doctor_oy)<0.1)doctor_oy=0
 	if parsing and t%5==0 then
-		doctor_oy=-2
+		doctor_oy+=1
 	end
 	
 	conveyor_spawner()
