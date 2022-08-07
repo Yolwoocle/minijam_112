@@ -84,7 +84,7 @@ function _init()
 		target_y=40,
 	}
 
-	dead_list={to_fit("LOUIE CHAPMAN WAS NEVER SEEN AGAIN",11)}
+	dead_list={}
 	dead_list_obj={
 		dobj=create_dobj(128,0)
 	}
@@ -130,7 +130,7 @@ function _init()
 	speech_arrow_up=false
 
 	clock=0
-	maxclock=60*30 -- be careful about overflowing the tiny p8 limit
+	maxclock=60*90 -- be careful about overflowing the tiny p8 limit
 	-- clock=maxclock
 
 	report_shifted_on_left = false
@@ -525,6 +525,7 @@ function update_time()
 		anim_to_point({dobj=bubble_dobj}, 0, -10, 0.9)
 		speech_arrow_up=false
 		anim_to_point(cam, 0, -91, 0.9)
+		in_menu=true --tells things that we're back on the menu, baby !
 	end
 
 	if time_since_last==430 then
@@ -563,7 +564,7 @@ function update_time()
 		report.step+=1
 	end
 
-	if time_since_last==900 then
+	if time_since_last==900 and #dead_list!=0 then
 		-- Shift report card to left
 		anim_to_point(report, report.target_x-23, nil, 0.9)
 		anim_to_point(c,c.dobj.wx-23,nil,0.9)
@@ -609,7 +610,9 @@ function draw_time()
 	-- flashing text
 	local ocol = 4
 	if (time_percentage>90 and t%60<=30) ocol=3
-	text_bold(h..":"..m.._end,99,3, 0,ocol)
+	local out=h..":"..m.._end
+	if(clock==0)out=" 5:00PM"
+	text_bold(out,99,3, 0,ocol)
 end
 
 -->8
