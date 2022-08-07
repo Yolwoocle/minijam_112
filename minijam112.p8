@@ -424,6 +424,8 @@ function update_time()
 
 	if(c.mode!="report")return
 
+	local _x,_y=dx(report.dobj),dy(report.dobj)
+
 	if time_since_last==0 then
 		anim_to_point(c,nil,150,0.9)
 	end
@@ -441,9 +443,10 @@ function update_time()
 		anim_to_point(report, report.target_x, nil, 0.9)
 	end
 
+	if(time_since_last==720)anim_to_point(c,_x+10,_y+25)
+
 	--report card input loop
 	if(time_since_last>750 and time_since_last>report.last_input+60 and btnp(❎)) then
-		debug=report.step
 
 		if(report.step==1)report.adj1=rnd(positive_adj)
 		if(report.step==2)report.sticker_ox=-3+rnd(6)report.sticker_oy=-3+rnd(6)report.sticker=true
@@ -452,6 +455,10 @@ function update_time()
 
 		if(report.step!=0)sfx(47+report.step)shake=0.1
 		if(report.step==8)sfx(55)shake=0.2
+
+		if(report.step==1)anim_to_point(c,_x+70,_y+30)
+		if(report.step>=2 and report.step<=6)anim_to_point(c,_x+10,_y+43+((report.step-2)*8))
+		if(report.step==7)anim_to_point(c,_x+50,_y+90)
 		
 	
 
@@ -461,6 +468,7 @@ function update_time()
 
 	if time_since_last==1100 then
 		anim_to_point(report, report.target_x-23, nil, 0.9)
+		anim_to_point(c,c.dobj.wx-23,nil,0.9)
 
 		update_dead_list()
 	end
@@ -570,7 +578,6 @@ function draw_report()
 
 	for i=1,5 do
 		if(report.cur_mark>=i)spr(21,_x+5,_y+41+((i-1)*8))
-		debug=i..","..report.cur_mark
 	end
 
 	local y_cont=43+(i*8)+2
