@@ -643,8 +643,16 @@ function update_time()
 
 	--to finish the round
 	if(time_since_last>750 and report.step==10 and btnp(❎)) then
-		init_and_start_round()
+		to_menu()
+		--init_and_start_round()
 	end
+end
+
+function to_menu()
+	--c.mode="menu"
+	in_menu=true
+
+	logo.dobj.wx=logo.default_x
 end
 
 function draw_time()
