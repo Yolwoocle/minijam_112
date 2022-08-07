@@ -80,8 +80,10 @@ function _init()
 	}
 
 	dead_list=""
-	dead_list_ypos=0
-	dead_list_oy=0
+	dead_list_obj={
+		dobj=create_dobj(128,-87)
+	}
+
 
 	bubbles={}
 
@@ -129,6 +131,9 @@ function _init()
 
 	clock=0
 	maxclock=60*10 -- be careful about overflowing the tiny p8 limit
+	-- clock=maxclock
+
+	if(debugmode) parse_speed = 1
 end
 
 function _update60()
@@ -137,7 +142,7 @@ function _update60()
 	update_time()
 	on_speech_end()
 
-	dead_list_oy+=1/6
+	dead_list_obj.dobj.oy+=1/6
 
 	menuitem(3, "sound: "..(sound_on and "on" or "off"), function() sound_on=not sound_on end)
 
@@ -214,7 +219,12 @@ function _draw()
 
 	if(intro_phase>=1) draw_time()
 
-	print(dead_list,83,dead_list_ypos+dead_list_oy,5)
+	-- draw dead list
+	local x,y=dx(dead_list_obj.dobj),dy(dead_list_obj.dobj)
+	rrect(x,-87+1,61,90,1)
+	rrect(x,-87  ,61,90,4)
+	print(dead_list,x+1,y,5)
+	rectfill(x,5,127,3+31, 8)
 	
 	draw_pdoctor()
 	draw_bubble()
@@ -230,7 +240,7 @@ function _draw()
 		print(ailment_out,6,5+dy(bubble_dobj),3)
 	end
 	
-	if(debugmode)print(debug,1,1,9)
+	if(debugmode)print("debug",1,1,8)
 end
 
 -->8
@@ -240,17 +250,26 @@ function update_dead_list()
 	local out=" "
 	local ways_to_die=split" WAS NEVER SEEN AGAIN, STILL GETS NIGHTMARES, HASNT STOPPED CRYING,'S FAMILY MISSES THEM, NEVER MADE IT HOME, WILL NEVER RETURN, DIED A GRUESOME DEATH, LEFT THEIR WALLET, NOW SUFFERS FROM ANXIETY, HASNT EATEN IN DAYS, WAS ARRESTED, IS NOW IN JAIL, SUFFERED A FATE WORSE THAN DEATH, IS NOT THE SAME ANYMORE"
 	local died_of_variations=split" DIED OF , PERISHED OF "
+	local list_h=0
 	for customer in all(past_customers) do
 		--if customer.score<0 then
 		--	out..=to_fit(customer.name.." DIED OF "..customer.cause.."\n\n",14)
 		--end
 		local fate=rnd(ways_to_die)
 		if(flr(rnd(2))==0)fate=rnd(died_of_variations)..customer.cause
-		out..=to_fit(customer.name..fate.."\n\n",11)
+		local fit=to_fit(customer.name..fate.."\n\n",11)
+		out..=fit
+		
+		-- count number of lines
+		local h=1
+		for i=1,#fit do
+			if(sub(fit,i,i)=="\n")h+=1
+		end
+		list_h+=h
 	end
 
-	dead_list_ypos=-110
-	dead_list_oy=0
+	dead_list_obj.dobj._y=-110-list_h*6
+	dead_list_obj.dobj.oy=0
 	dead_list=out
 end
 
@@ -473,8 +492,10 @@ function update_time()
 	end
 
 	if time_since_last==1100 then
+		-- Shift report card to left
 		anim_to_point(report, report.target_x-23, nil, 0.9)
 		anim_to_point(c,c.dobj.wx-23,nil,0.9)
+		anim_to_point(dead_list_obj, 83, nil, 0.9)
 
 		update_dead_list()
 	end
@@ -999,30 +1020,47 @@ function in_list(list,item)
 	return false
 end 
 
-
 function to_fit(_text,_w,_extra)
- local out=""
- local _ex=_extra or ""
- local length=#_text
- local brstr=split(_text," ")
- local i=1
- local tmp=""
- local trails=false
- while i<(#brstr+1) do
-  if (#tmp+#brstr[i]) <= _w then
-            tmp=tmp..brstr[i].." "
-            i+=1  
-            trails=true
-  else
-   out=out..tmp.."\n".._ex
-   tmp="" 
-   trails=false
-  end
- end
- if trails then
-  out=out..tmp
- end
- return (out)
+	local out=""
+	local _ex=_extra or ""
+	local length=#_text
+	local unfilt_brstr=split(_text," ")
+	local tmp=""
+	local trails=false
+	--clean up input
+	local brstr={}
+	-- local i=1
+	for i=1,#unfilt_brstr do
+		local word = unfilt_brstr[i]
+		if #word > _w then
+			local a,b = sub(word,1,_w), sub(word,_w+1,-1)
+			add(brstr,a)
+			add(brstr,b)
+		else
+			add(brstr,word)
+		end
+	end
+
+-- [[
+	local i=1
+	local h=0
+	while i<(#brstr+1) do
+		if (#tmp+#brstr[i]) <= _w then
+		    tmp=tmp..brstr[i].." "
+		    i+=1  
+		    trails=true
+		else
+			out=out..tmp.."\n".._ex
+			tmp="" 
+			trails=false
+			h+=1
+		end
+	end
+	if trails then
+		out=out..tmp
+	end
+	return out
+--]]
 end
 
 --screen shake function
@@ -1074,6 +1112,7 @@ end
 --data
 
 all_effects=split"SUMMONS GIANT PEACH,GLOWS IN THE DARK,FINISHES YOUR ESSAY,SUMMONS A TORNADO,FACILITATES DIGESTION,MELTS FACE,FIGHTS POVERTY,SMELLS LIKE TEEN SPIRIT,TURNS INTO A SWORD,TURNS INTO A TOAD,SETS YOU ON FIRE,RELEASES INHIBITIONS,INCREASES MULTITASKING,LOWERS CHOLESTEROL,INCREASES MEMORY,REDUCES MEMORY LOSS,STRENGTHENS BONE MARROW,INCREASES CHARISMA,REJUVENATES HAIR GROWTH,FACILITATES CONFIDENCE,HARDENS SKIN,HIGH IN VITAMIN C,BREAKS FOURTH WALL,INCREASES PUNGENCY,UNTERRICHTET dEUTSCH,FINDS KEYS,GIVES A FEVER,HARDENS LIVER,DRIES MOUTH,INDUCES VOMITING,REMOVES TASTE,INCREASE COORDINATION,TURNS URINE GREEN,AMPLIFIES TINNITUS,EMITS 5G SIGNAL,BOOSTS TASTE,TASTES OF ORANGE,JUST GETS YOU STONED,INCREASES STRENGTH,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STEALTH,RAISES HIT POINTS,RAISES MAGIC POINTS,RAISES SPEED,INCREASES INTELLIGENCE,LOWERS INTELLIGENCE,LOWERS SPEED,LOWERS HP,DECREASES STEALTH,DECREASES MAGIC,DECREASES STRENGTH,DECREASES DEXTERITY,INCREASES CONSTITUTION,DECREASES CONSTITUTION,INCREASES WISDOM,DECREASES WISDOM,RAISES RECOVERY,INSTILLS PARANOIA,PROBABLY BOOSTS LUCK,FREAKS EVERYONE OUT,INCREASES POISON RES,INCREASES FIRE RES,LOWERS FIRE RES,LOWERS POISON RES,RAISES GLASS CEILING,INSTANT DEATH,RAISES SEX APPEAL,RELEASES PHEROMONES,THICKENS BLOOD,INDUCES STRESS,INDUCES MANIA,INDUCES VOMITING,CURES HANGOVER"
+--TURNS INTO DRAGON,MAKES YOU SHRINK
 all_solutions={
 	"A BROKEN HEART|HIGH IN VITAMIN C,LOWERS CHOLESTEROL,RAISES SEX APPEAL,RELEASES PHEROMONES,FACILITATES CONFIDENCE,HARDENS SKIN",
 	"BAD BODY ODOUR|RELEASES PHEROMONES,HIGH IN VITAMIN C,INCREASES CHARISMA,HARDENS SKIN,REMOVES TASTE,TASTES OF ORANGE",
@@ -1086,7 +1125,7 @@ all_solutions={
 	"BEING ON THEIR PHONE WHILE DRIVING|INCREASES WISDOM,INCREASES MULTITASKING,INCREASES INTELLIGENCE",
 	"FREEZING|SETS YOU ON FIRE,RAISES RECOVERY",
 	"LEAVING THE OVEN ON|INCREASE COORDINATION,INCREASES FIRE RES",
-	"A GUNSHOT|RAISES HP,HARDENS SKIN",
+	"A GUNSHOT|RAISES HP,HARDENS SKIN,INCREASES RESISTANCE",
 	"NOT KNOWING WHEN TO HOLD 'EM|INCREASES STEALTH,FREAKS EVERYONE OUT",
 	"WEAK BONES|STRENGTHENS BONE MARROW,HIGH IN VITAMIN C",
 	"BALDING|REJUVENATES HAIR GROWTH,INCREASES CHARISMA",
@@ -1100,7 +1139,13 @@ all_solutions={
 	"NO INTERNET|EMITS 5G SIGNAL",
 	"BOREDOM|TURNS INTO A SWORD,INSTANT DEATH,INSTILLS PARANOIA,JUST GETS YOU STONED,EMITS 5G SIGNAL,AMPLIFIES TINNITUS,TURNS URINE GREEN,SETS YOU ON FIRE,REJUVENATES HAIR GROWTH,FINDS KEYS",
 	"AGGRESSIVE SEALIFE|INCREASES STRENGTH,FACILITATES CONFIDENCE",
-	"HUNGER|SUMMONS GIANT PEACH,FACILITATES DIGESTION,HIGH IN VITAMIN C,REMOVES TASTE,TASTES OF ORANGE,JUST GETS YOU STONED"
+	"HUNGER|SUMMONS GIANT PEACH,FACILITATES DIGESTION,HIGH IN VITAMIN C,REMOVES TASTE,TASTES OF ORANGE,JUST GETS YOU STONED",
+	"NOT BEING TO HANDLE OUR STRONGEST POTION|TURNS INTO DRAGON,RAISES HP,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STRENGTH,FACILITATES DIGESTION,",
+	"DISCOVERING DYNAMITE|INCREASES RESISTANCE,RAISES HP,STRENGTHENS BONE MARROW,HARDENS SKIN",
+	"CONSTIPATION|FACILITATES DIGESTION,TURNS INTO A TOAD",
+	"POVERTY|INCREASES INTELLIGENCE,TURNS INTO A TOAD,INCREASES CHARISMA,FACILITATES CONFIDENCE",
+	"BEING UGLY|INCREASES STEALTH,INCREASES CHARISMA,JUST GETS YOU STONED",
+	-- "COMEDY|BREAKS FOURTH WALL",
 }
 
 titles=split"SIR,COUNT,BARON VON,DUCHES,PRINCE,KING,QUEEN,DOCTOR"
