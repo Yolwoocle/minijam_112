@@ -141,8 +141,12 @@ function _init()
 	report_shifted_on_left = false
 	main_menu = true
 
+	bubbles_on_foreground = false
 	time_before_confetti=-1
 
+	spoon={
+		dobj=create_dobj(0,0)
+	}
 	-- if(debugmode) parse_speed = 1
 end
 
@@ -265,7 +269,7 @@ function _draw()
 	-- draw logo
 	draw_logo()
 	
-	if(c.mode=="report")draw_bubbles()
+	if(bubbles_on_foreground)draw_bubbles()
 
 	if(debugmode)print("debug",1,dy(cam.dobj),8)
 end
@@ -507,7 +511,7 @@ function update_time()
 		if(report.step==7)anim_to_point(c,_x+50,_y+90)
 		if(report.step==8)anim_to_point(c,_x+50,_y+100) --move hand away after signature
 	
-		if(report.step==8)time_before_confetti=50
+		if(report.step==8)time_before_confetti=50 bubbles_on_foreground=true
 
 		report.last_input=time_since_last
 		report.step+=1
