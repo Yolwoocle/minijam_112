@@ -88,7 +88,7 @@ function _init()
 
 	dead_list={}
 	dead_list_obj={
-		dobj=create_dobj(128,0)
+		dobj=create_dobj(135,0)
 	}
 
 
@@ -164,7 +164,7 @@ function _update60()
 
 	update_menu()
 
-	if(report_shifted_on_left) dead_list_obj.dobj.oy-=1/6
+	--if(report_shifted_on_left) dead_list_obj.dobj.oy-=1/6
 
 	menuitem(3, "sound: "..(sound_on and "on" or "off"), function() sound_on=not sound_on end)
 	menuitem(4, "end day", function() clock=maxclock-2 end)
@@ -295,7 +295,7 @@ function reset_data()
 	hide_bubble=false
 
 	report.dobj.wx=130
-	dead_list_obj.dobj.wx=128
+	dead_list_obj.dobj.wx=135
 
 	g_ingredients={}
 	spawn_rate=80
@@ -623,7 +623,11 @@ function update_time()
 		if(report.step==7)anim_to_point(c,_x+50,_y+90,c_anim_speed)
 		if(report.step==8)anim_to_point(c,_x+50,_y+100,c_anim_speed) --move hand away after signature
 	
-		if(report.step==8)time_before_confetti=50 bubbles_on_foreground=true
+		if(report.step==8) then
+			time_before_confetti=50 
+			bubbles_on_foreground=true
+			anim_to_point(c,nil,45,0.95)
+		end
 
 		report.last_input=time_since_last
 		report.step+=1
