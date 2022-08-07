@@ -25,11 +25,30 @@ function _init()
 	cam={
 		dobj=create_dobj(0,-91),
 	}
+
+	report={
+		dobj=create_dobj(130,-90),
+		target_x=24,
+
+		last_input=0,
+
+		step=1,
+
+		adj1="",
+
+		sticker=false,
+		sticker_ox=rnd(6)-3,
+		sticker_oy=rnd(6)-3,
+
+		cur_mark=0,
+
+		signature=false,
+	}
 	
 	c={
 		dobj=create_dobj(63,63),
 		sel_index=1,
-		mode="ingredients"
+		mode="menu"
 	}
 
 	ticks={false,false,false}
@@ -59,6 +78,10 @@ function _init()
 		target_y=40,
 	}
 
+	dead_list=""
+	dead_list_ypos=0
+	dead_list_oy=0
+
 	bubbles={}
 
 	st=0 --spawn time
@@ -85,6 +108,7 @@ function _init()
 
 	parse_output=""
 	ailment_out=""
+	hide_bubble=false
 
 	ingr_particles={}
 
@@ -100,12 +124,17 @@ function _init()
 	}
 
 	clock=0
-	maxclock=60*60*3 -- be careful about overflowing the tiny p8 limit
+	maxclock=60*10 -- be careful about overflowing the tiny p8 limit
 end
 
 function _update60()
 	t+=1
 	
+	update_time()
+	on_speech_end()
+
+	dead_list_oy+=1/6
+
 	menuitem(3, "sound: "..(sound_on and "on" or "off"), function() sound_on=not sound_on end)
 
 	if(conveyor_active)st+=1 --only iterate spawn timer is the conveyor is active
@@ -144,8 +173,6 @@ function _update60()
 	
 	parse_dialogue()
 	update_anim()
-
-	update_time()
 end
 
 function _draw()
@@ -178,6 +205,13 @@ function _draw()
 
 	-- rectfill(-5,-5,135,34,2)
 	rectfill(-5,-120,135,34,2)
+
+	draw_report()
+
+	if(intro_phase>=1) draw_time()
+
+	print(dead_list,83,dead_list_ypos+dead_list_oy,5)
+	
 	draw_pdoctor()
 	draw_bubble()
 
@@ -186,18 +220,34 @@ function _draw()
 	
 	draw_cursor()
 	
-	if(intro_phase>=1) draw_time()
+
+	if(not hide_bubble)then
+		print(parse_output,6,5,5)
+		print(ailment_out,6,5,4)
+	end
 	
-	
-	
-	print(parse_output,6,5,5)
-	print(ailment_out,6,5,4)
-	
-	if(debugmode)print(debug,1,1,7)
+	if(debugmode)print(debug,1,1,9)
 end
 
 -->8
 --update
+
+function update_dead_list()
+	local out=" "
+	local ways_to_die=split" WAS NEVER SEEN AGAIN, STILL GETS NIGHTMARES, HASNT STOPPED CRYING,S FAMILY MISSES THEM, NEVER MADE IT HOME, WILL NEVER RETURN, DIED A GRUESOME DEATH, LEFT THEIR WALLET, NOW SUFFERS FROM ANXIETY, HASNT EATEN IN DAYS, WAS ARRESTED, IS NOW IN JAIL, SUFFERED A FATE WORSE THAN DEATH, IS NOT THE SAME ANYMORE"
+	for customer in all(past_customers) do
+		--if customer.score<0 then
+		--	out..=to_fit(customer.name.." DIED OF "..customer.cause.."\n\n",14)
+		--end
+		local fate=rnd(ways_to_die)
+		if(flr(rnd(2))==0)fate=" DIED OF "..customer.cause
+		out..=to_fit(customer.name..fate.."\n\n",11)
+	end
+
+	dead_list_ypos=-110
+	dead_list_oy=0
+	dead_list=out
+end
 
 function return_to_belt()
 	c.mode="ingredients"
@@ -265,6 +315,8 @@ function update_cursor()
 
 				del(g_ingredients,ingr)
 				commit_ingredient(ingr.obj)
+
+				sfx(58)
 	
 				cur_fx_dobj.target=t+60
 
@@ -273,10 +325,6 @@ function update_cursor()
 				
 				c.sel_index=mid(1,c.sel_index,#g_ingredients) --fix cursor
 			end
-		end
-	elseif c.mode=="pot" then
-		if btnp(❎) and time_since_last>300 then
-			return_to_belt()
 		end
 	end
 end
@@ -330,8 +378,13 @@ function commit_ingredient(_ingr)
 		local format=rnd(result_dialogue)
 
 		--check scores and create new dialogue
-		if(pot.score>5) then adjectives=positive_adj else adjectives=negative_adj end
-		if(flr(rnd(10))==0)adjectives=neutral_adj
+		if(pot.score>5) then
+			adjectives=positive_adj 
+		elseif(pot.score<5) then
+			adjectives=negative_adj
+		else
+			adjectives=neutral_adj
+		end
 		
 		--set up dialogue queue
 		dialogue_queue=pack(format[1]..ailment_manager.customer.." "..format[2].." ",rnd(adjectives),format[3])
@@ -353,11 +406,69 @@ function commit_ingredient(_ingr)
 end
 
 function update_time()
-	clock+=1
-	clock=min(clock,maxclock)
+	if(c.mode=="ingredients")clock+=1
+
+	if clock==maxclock then
+		--end game
+		c.mode="report"
+		clock=0
+		conveyor_active=false
+
+		--anim_to_point(c,,130,0.97)
+
+		dialogue_queue=pack("LOOKS LIKE ITS TIME TO CLOSE UP SHOP ","","")
+		dialogue_queue_time=30
+		time_since_last=0
+	end
+
+
+	if(c.mode!="report")return
+
+	if time_since_last==0 then
+		anim_to_point(c,nil,150,0.9)
+	end
+
+	if time_since_last==350 then
+		anim_to_point(cam, 0, -91, 0.9)
+	end
+
+	if time_since_last==430 then
+		new_dialogue("WHAT A"," WONDERFUL ","DAY !")
+	end
+
+	if time_since_last==700 then
+		hide_bubble=true
+		anim_to_point(report, report.target_x, nil, 0.9)
+	end
+
+	--report card input loop
+	if(time_since_last>750 and time_since_last>report.last_input+60 and btnp(❎)) then
+		debug=report.step
+
+		if(report.step==1)report.adj1=rnd(positive_adj)
+		if(report.step==2)report.sticker_ox=-3+rnd(6)report.sticker_oy=-3+rnd(6)report.sticker=true
+		if(report.step>2 and report.step<=7)report.cur_mark+=1
+		if(report.step==8)report.signature=true
+
+		if(report.step!=0)sfx(47+report.step)shake=0.1
+		if(report.step==8)sfx(55)shake=0.2
+		
+	
+
+		report.last_input=time_since_last
+		report.step+=1
+	end
+
+	if time_since_last==1100 then
+		anim_to_point(report, report.target_x-23, nil, 0.9)
+
+		update_dead_list()
+	end
 end
 
 function draw_time()
+	if(c.mode=="report")return -- "this is scuffed as fuck I hate this line" - Louie
+
 	local leftt = maxclock - clock
 	local leftsecs= leftt\60
 	local timesec = leftsecs%60
@@ -403,8 +514,9 @@ end
 
 --draw speech bubble
 function draw_bubble()
+if(hide_bubble)return	
 	local _x,_y=3,3
-	local _w,_h=78,28	
+	local _w,_h=78,28
 	
 	--78 is normal width
 	_w=min(8+#parse_output*4,78)
@@ -429,6 +541,52 @@ function draw_cursor()
 	sspr(48,0,16,15,_x,_y)
 end
 
+function draw_report()
+	local _x,_y=dx(report.dobj),dy(report.dobj)
+	local _w,_h=80,100
+
+	rectfill(_x,_y,_x+_w,_y+_h,7)
+	rect(_x,_y,_x+_w,_y+_h,5)
+
+	text_bold2("SELF-REPORT CARD",_x+3,_y+2,7,1)
+	line(_x+3,_y+10,_x+_w-3,_y+10,1)
+
+	rect(_x+60,_y+22,_x+75,_y+37,6) --sticker area
+
+	text_bold("TODAY I AM FEELING",_x+3,_y+13,7,1)
+	text_bold(" - "..report.adj1,_x+3,_y+20,7,5)
+
+	if(report.sticker)spr(8,_x+60+report.sticker_ox,_y+22+report.sticker_oy,2,2)
+
+	line(_x+3,_y+29,_x+_w-25,_y+29,1)
+
+	text_bold("TODAY I...",_x+3,_y+35,7,1)
+
+	local i=0
+	for text in all(split"TRIED MY BEST,HELPED TIDY,USED MY MANNERS,ATE ALL MY FOOD,STAYED FOCUSED") do
+		text_bold("[] "..text,_x+5,_y+43+i*8,7,5)
+		i+=1
+	end
+
+	for i=1,5 do
+		if(report.cur_mark>=i)spr(21,_x+5,_y+41+((i-1)*8))
+		debug=i..","..report.cur_mark
+	end
+
+	local y_cont=43+(i*8)+2
+	line(_x+3,_y+y_cont,_x+_w-3,_y+y_cont,1)
+
+	text_bold2("SIGNED:",_x+4,_y+_h-10,7,1)
+	line(_x+35,_y+_h-5,_x+_w-5,_y+_h-5,6)
+
+	local sx,sy,sw,sh=39,21,41,8
+
+	if(report.signature)sspr(sx,sy,sw,sh,_x+35,_y+_h-12)
+
+	line(_x,_y+_h+1,_x+_w,_y+_h+1,0)
+
+end
+
 function draw_ingredients()
 	for ingredient in all(g_ingredients) do
 		local _x,_y=dx(ingredient.dobj), dy(ingredient.dobj)
@@ -450,6 +608,8 @@ function animate_score_mode()
 	conveyor_speed=conveyor_speed_original
 	if(not conveyor_active)conveyor_speed=0
 
+	--debug=time_since_last
+
 	if(c.mode!="pot")return 
 
 	if(time_since_last>30)anim_to_point(potion,30,potion.target_y)
@@ -460,6 +620,7 @@ function animate_score_mode()
 		if time_since_last==30+text_finish_time+i*23 then
 			shake=0.07
 			ticks[i]=true
+			sfx(59)
 		end
 	end
 
@@ -588,9 +749,15 @@ function update_anim()
 end
 
 function on_speech_end()
-	if intro_phase==0 then
+	if intro_phase==0 and parsing==false and c.mode=="menu" and btnp(❎) then
 		intro_phase=1
-		anim_to_point(cam, 0,0, 0.97)
+
+		anim_to_point(cam, 0,0, 0.9)
+		c.mode="ingredients"
+
+		clock=0
+
+		time_since_last=0
 	end
 end
 
@@ -801,7 +968,6 @@ function parse_dialogue()
 		parse_length+=1
 	else
 		parsing=false
-		on_speech_end()
 	end
 end
 
@@ -887,7 +1053,7 @@ end
 -->8
 --data
 
-all_effects=split"SUMMONS GIANT PEACH,GLOWS IN THE DARK,WRITES AN ESSAY,SUMMONS A TORNADO,FACILITATES DIGESTION,MELTS FACE,INCREASES POVERTY,SMELLS LIKE TEEN SPIRIT,TURNS INTO A CHAIR,TURNS INTO A TOAD,SETS YOU ON FIRE,INCREASES MULTITASKING,LOWERS CHOLESTEROL,INCREASES MEMORY,REDUCES MEMORY LOSS,STRENGTHENS BONE MARROW,INCREASES CHARISMA,REJUVENATES HAIR GROWTH,FACILITATES CONFIDENCE,HARDENS SKIN,HIGH IN VITAMIN C,BREAKS FOURTH WALL,INCREASES PUNGENCY,UNTERRICHTET dEUTSCH,FINDS KEYS,GIVES A FEVER,HARDENS LIVER,DRIES MOUTH,INDUCES VOMITING,REMOVES TASTE,INCREASE COORDINATION,TURNS URINE GREEN,AMPLIFIES TINNITUS,EMITS 5G SIGNAL,BOOSTS TASTE,TASTES OF ORANGE,JUST GETS YOU STONED,INCREASES STRENGTH,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STEALTH,RAISES HIT POINTS,RAISES MAGIC POINTS,RAISES SPEED,INCREASES INTELLIGENCE,LOWERS INTELLIGENCE,LOWERS SPEED,LOWERS HP,DECREASES STEALTH,DECREASES MAGIC,DECREASES STRENGTH,DECREASES DEXTERITY,INCREASES CONSTITUTION,DECREASES CONSTITUTION,INCREASES WISDOM,DECREASES WISDOM,RAISES RECOVERY,INSTILLS PARANOIA,PROBABLY BOOSTS LUCK,FREAKS EVERYONE OUT,INCREASES POISON RES,INCREASES FIRE RES,LOWERS FIRE RES,LOWERS POISON RES,RAISES GLASS CEILING,INSTANT DEATH,RAISES SEX APPEAL,RELEASES PHEROMONES,THICKENS BLOOD,INDUCES STRESS,INDUCES MANIA,INDUCES VOMITING,CURES HANGOVER"
+all_effects=split"SUMMONS GIANT PEACH,GLOWS IN THE DARK,FINSHES YOUR ESSAY,SUMMONS A TORNADO,FACILITATES DIGESTION,MELTS FACE,FIGHTS POVERTY,SMELLS LIKE TEEN SPIRIT,TURNS INTO A SWORD,TURNS INTO A TOAD,SETS YOU ON FIRE,RELEASES INHIBITIONS,INCREASES MULTITASKING,LOWERS CHOLESTEROL,INCREASES MEMORY,REDUCES MEMORY LOSS,STRENGTHENS BONE MARROW,INCREASES CHARISMA,REJUVENATES HAIR GROWTH,FACILITATES CONFIDENCE,HARDENS SKIN,HIGH IN VITAMIN C,BREAKS FOURTH WALL,INCREASES PUNGENCY,UNTERRICHTET dEUTSCH,FINDS KEYS,GIVES A FEVER,HARDENS LIVER,DRIES MOUTH,INDUCES VOMITING,REMOVES TASTE,INCREASE COORDINATION,TURNS URINE GREEN,AMPLIFIES TINNITUS,EMITS 5G SIGNAL,BOOSTS TASTE,TASTES OF ORANGE,JUST GETS YOU STONED,INCREASES STRENGTH,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STEALTH,RAISES HIT POINTS,RAISES MAGIC POINTS,RAISES SPEED,INCREASES INTELLIGENCE,LOWERS INTELLIGENCE,LOWERS SPEED,LOWERS HP,DECREASES STEALTH,DECREASES MAGIC,DECREASES STRENGTH,DECREASES DEXTERITY,INCREASES CONSTITUTION,DECREASES CONSTITUTION,INCREASES WISDOM,DECREASES WISDOM,RAISES RECOVERY,INSTILLS PARANOIA,PROBABLY BOOSTS LUCK,FREAKS EVERYONE OUT,INCREASES POISON RES,INCREASES FIRE RES,LOWERS FIRE RES,LOWERS POISON RES,RAISES GLASS CEILING,INSTANT DEATH,RAISES SEX APPEAL,RELEASES PHEROMONES,THICKENS BLOOD,INDUCES STRESS,INDUCES MANIA,INDUCES VOMITING,CURES HANGOVER"
 all_solutions={
 	"A BROKEN HEART|HIGH IN VITAMIN C,LOWERS CHOLESTEROL,RAISES SEX APPEAL,RELEASES PHEROMONES,FACILITATES CONFIDENCE,HARDENS SKIN",
 	"BAD BODY ODOUR|RELEASES PHEROMONES,HIGH IN VITAMIN C,INCREASES CHARISMA,HARDENS SKIN,REMOVES TASTE,TASTES OF ORANGE",
@@ -895,28 +1061,26 @@ all_solutions={
 	"SOCIAL REJECTION|EMITS 5G SIGNAL,FACILITATES CONFIDENCE,RAISES SEX APPEAL,RELEASES PHEROMONES,BREAKS FOURTH WALL,JUST GETS YOU STONED",
 	"BEING STABBED|FACILITATES CONFIDENCE,INCREASES CHARISMA,HARDENS SKIN,RAISES HP",
 	"A BEAR ATTACK|RAISES HP,RAISES RECOVERY,HARDENS SKIN",
-	"GANG VIOLENCE|INDUCES VOMITING,RAISES SPEED,RAISES HP,INCREASES STEALTH,PROBABLY BOOSTS LUCK,FREAKS EVERYONE OUT",
+	"GANG VIOLENCE|RELEASES INHIBITIONS,INDUCES VOMITING,RAISES SPEED,RAISES HP,INCREASES STEALTH,PROBABLY BOOSTS LUCK,FREAKS EVERYONE OUT",
 	"DRINKING THE WRONG POTION|INCREASES PUNGENCY,INCREASES INTELLIGENCE,INCREASES MEMORY,REDUCES MEMORY LOSS",
-	"FORGETFULNESS|INCREASES INTELLIGENCE,INCREASES MEMORY",
 	"BEING ON THEIR PHONE WHILE DRIVING|INCREASES WISDOM,INCREASES MULTITASKING,INCREASES INTELLIGENCE",
 	"FREEZING|SETS YOU ON FIRE,RAISES RECOVERY",
 	"LEAVING THE OVEN ON|INCREASE COORDINATION,INCREASES FIRE RES",
 	"A GUNSHOT|RAISES HP,HARDENS SKIN",
 	"NOT KNOWING WHEN TO HOLD 'EM|INCREASES STEALTH,FREAKS EVERYONE OUT",
-	"WEAK BONES|STRENGTHENS BONE MARROW",
+	"WEAK BONES|STRENGTHENS BONE MARROW,HIGH IN VITAMIN C",
 	"BALDING|REJUVENATES HAIR GROWTH,INCREASES CHARISMA",
 	"LOSING THEIR KEYS|FINDS KEYS,INSTILLS PARANOIA,INCREASES WISDOM,INCREASES MEMORY,REDUCES MEMORY LOSS",
 	"NOT SPEAKING GERMAN|UNTERRICHTET dEUTSCH",
-	-- "NOT HAVING ENOUGH HP|RAISES HP",
-	-- "NOT HAVING ENOUGH MP|RAISES MP",
 	"FALLING OFF THEIR HORSE|INCREASE COORDINATION",
-	"DRINKING TOO MUCH|HARDENS LIVER,INDUCES VOMITING",
+	"DRINKING TOO MUCH|HARDENS LIVER,INDUCES VOMITING,RELEASES INHIBITIONS",
 	"A FIREBALL|INCREASES FIRE RES,HARDENS SKIN",
 	"A SUDDEN STROKE|LOWERS CHOLESTEROL,INSTANT DEATH",
 	"OLD AGE|LOWERS CHOLESTEROL,HARDENS LIVER,RAISES HP",
 	"NO INTERNET|EMITS 5G SIGNAL",
 	"BOREDOM|TURNS INTO A CHAIR,INSTANT DEATH,INSTILLS PARANOIA,JUST GETS YOU STONED,EMITS 5G SIGNAL,AMPLIFIES TINNITUS,TURNS URINE GREEN,SETS YOU ON FIRE,REJUVENATES HAIR GROWTH,FINDS KEYS",
-	"A MURDERER PENGUIN|INCREASES STRENGTH,FREAKS EVERYONE OUT,SETS YOU ON FIRE,FACILITATES CONFIDENCE",
+	"AGGRESSIVE SEALIFE|INCREASES STRENGTH,FACILITATES CONFIDENCE",
+	"HUNGER|SUMMONS GIANT PEACH,FACILITATES DIGESTION,HIGH IN VITAMIN C,REMOVES TASTE,TASTES OF ORANGE,JUST GETS YOU STONED"
 }
 
 titles=split"SIR,COUNT,BARON VON,DUCHES,PRINCE,KING,QUEEN,DOCTOR"
@@ -936,45 +1100,46 @@ result_dialogue={
 	split"YOU THOUGHT ,WAS,.",
 	split",CANT STOP THINKING ABOUT HOW, YOU WERE",
 	split",DOUBTS THEYLL EVER FEEL THIS, AGAIN",
-	split"I HEARD ,SHOUT HOW , THEY FELT ONCE OUTSIDE !"
+	split"I HEARD ,SHOUT HOW, THEY FELT ONCE OUTSIDE !",
+	split",WONDERS IF THIS IS AS, AS IT GETS !",
 }
 
 potion_types=split"jumping,wonder,slime,speed,dexterity,anger,anxiety,invisibility,money,freedom,flight,love,romance,restoration,answering,attention,beauty,bravery,chaos,charm,charisma,cowardice,dancing,death,disguise,drunkenness,empathy,floating,fortitude,glowing,growth,happiness,healing,hearing,immunity,leadership,life,luck,loyalty,melting,noise,owl-eyes,shrinking,spiders,terror,strength"
 
-positive_adj=split"COURAGEOUS,GOOD,WONDERFUL,FANTASTIC,ENLIGHTENING,ELECTRIC,LIFE-CHANGING,POWERFUL,FUN,CUTE,ROMANTIC,SEXY,COMELY,CARING,CLEAN,EXCITED,HAPPY,SWEET,BRIGHT,CREATIVE,DYNAMIC,FUNNY,LIKABLE,LOYAL,SINCERE,POLITE,FORTUITOUS,GORGEOUS,REMARKABLE,ROUSING,STELLAR,BRAVE,CAPABLE,PASSIONATE,SENSIBLE"
-negative_adj=split"BAD,TERRIBLE,DISGUSTING,OFFENSIVE,UGLY,SUCKY,AWFUL,GARBAGE,POOR,SAD,UNACCEPTABLE,CRUMMY,CHEAP,BORING,NOT GOOD,GROTTY,GRUNGY,INSOLENT,IRRITATED,BORING,HOSTILE,VAIN,IMPATIENT,VAGUE,BLEAK,BLIND,BLOATED,BLOODIED,BLOODTHIRSTY,RUDE,BOSSY,CLUMSY,EMPTY,GLUM,FIENDISH,EXPLOITED,EVIL,SCARED,GROGGY,HUNGOVER,JADED,PUTRID"
-neutral_adj=split"ASTOUNDING,WEIRD,STRANGE,OK,NEUTRAL,SMELLY,CREEPY,SPOOKY,GHASTLY,ECCENTRIC,SILLY,PECULIAR,KINKY,FEARFUL,UNCANNY,CAUSTIC,BIZARRE,CORPULENT,DOWDY,FECUND,LIMPID,PERSUASIVE,QUERULOUS,TRENCHANT,TURGID,INCANDESCENT,BUSY,COLD,SHORT"
+positive_adj=split"COURAGEOUS,GOOD,WONDERFUL,FANTASTIC,ENLIGHTENING,ELECTRIC,LIFE-CHANGING,POWERFUL,INCANDESCENT,FUN,CUTE,ROMANTIC,SEXY,COMELY,CARING,CLEAN,EXCITED,HAPPY,SWEET,BRIGHT,CREATIVE,DYNAMIC,FUNNY,LIKABLE,LOYAL,SINCERE,POLITE,FORTUITOUS,GORGEOUS,REMARKABLE,ROUSING,STELLAR,BRAVE,CAPABLE,PASSIONATE,SENSIBLE"
+negative_adj=split"ASTOUNDING,WEIRD,BAD,SMELLY,CREEPY,SPOOKY,FEARFUL,UNCANNY,GHASTLY,ECCENTRIC,TERRIBLE,DISGUSTING,OFFENSIVE,UGLY,SUCKY,AWFUL,GARBAGE,POOR,SAD,UNACCEPTABLE,CRUMMY,CHEAP,BORING,NOT GOOD,GROTTY,GRUNGY,INSOLENT,IRRITATED,HOSTILE,VAIN,IMPATIENT,BLEAK,BLIND,BLOATED,BLOODIED,BLOODTHIRSTY,RUDE,BOSSY,CLUMSY,EMPTY,GLUM,FIENDISH,EXPLOITED,EVIL,SCARED,GROGGY,HUNGOVER,JADED,PUTRID"
+neutral_adj=split"OK,NEUTRAL,SILLY,PECULIAR,KINKY,CAUSTIC,BIZARRE,DOWDY,BUSY,COLD,SHINY,REFLECTIVE,DRUNK,HIGH,SPONGE-Y,LIQUID,AROUSING"
 
 __gfx__
-fffffffffffffffffff000000ffffffffffff3333fff0000f00fffff000fffff000000000000000000000000fffffffffffffffffffffffffffffffffffff000
-ffffffffffffffff00004444000ffffffffff333333f00000440ff006440ffff000000000000000000000000fffffffffffffffffffffffffffffffffffff000
-fffffffffffffff0044444444400fffffffff333333300000444006406440fff000000000000000000000000fffffffffffffffff00000000ffffffffffff000
-fffffffffffffff04440000044400ffffffff333333300000644440644440fff000000000000000000000000fffffffffffffff00444444440fffffffffff000
-ffffffffffffff0440000000044400fffffff33333330000f0644444446440ff000000000000000000000000fffffffffffff00444444444440ffffffffff000
-ffffffffffffff0400000000004440fffffff00000000000ff064444644640ff000000000000000000000000ffffffffffff004444444444440ffffffffff000
-ffffffffffffff00044444000044400ffffff00000000000ff006444464440ff000000000000000000000000ffffffffffff0440000000004440fffffffff000
-ffffffffffffff00044444440004440ffffff00000000000ff0dd6444444400f000000000000000000000000ffffffffffff0000000000000440fffffffff000
-ffffffffffffff00444444440004440ffffff00000000000ff0d664444440440000000000000000000000000ffffffffffff0000000000000440fffffffff000
-fffffffffffff000444000444004440ffffff00000000000fff0664444444440000000000000000000000000ffffffffffff0044444444000000f00ffffff000
-ffffffffff000444440440044004440ffffff00000000000ffff06666604460f000000000000000000000000ffffffffffff04444444440444440000fffff000
-fffffffff0444444440440044404440ffffff00000000000fffff000006460ff000000000000000000000000fffffffffff0004400000440044400000ffff000
-fffffff0044444444440000440044400fffff00000000000ffffffff0d660fff000000000000000000000000ffffffffff00444404400440044000000ffff000
-fffff004444444444444444040444400fffff00000000000ffffffff0dd0ffff000000000000000000000000ffffffff00444444400004400000000000fff000
-fff00044444444444444444040444000fffff00000000000fffffffff00fffff000000000000000000000000fffffff0044444444444404044000000000ff000
-ff004444444444444444440400444000fffff000000000000000000000000000000000000000000000000000ffffff00444444444444404004000000000ff000
+fffffffffffffffffff000000ffffffffffff3333fff0000f00fffff000fffffffffffffffffffff00000000fffffffffffffffffffffffffffffffffffff000
+ffffffffffffffff00004444000ffffffffff333333f00000440ff006440ffffffff11111111ffff00000000fffffffffffffffffffffffffffffffffffff000
+fffffffffffffff0044444444400fffffffff333333300000444006406440ffffff1133333311fff00000000fffffffffffffffff00000000ffffffffffff000
+fffffffffffffff04440000044400ffffffff333333300000644440644440fffff113333333311ff00000000fffffffffffffff00444444440fffffffffff000
+ffffffffffffff0440000000044400fffffff33333330000f0644444446440fff11333333333311f00000000fffffffffffff00444444444440ffffffffff000
+ffffffffffffff0400000000004440fffffff00000000000ff064444644640fff13334433443331f00000000ffffffffffff004444444444440ffffffffff000
+ffffffffffffff00044444000044400ffffff00000000000ff006444464440fff13334433443331f00000000ffffffffffff0440000000004440fffffffff000
+ffffffffffffff00044444440004440ffffff00000000000ff0dd6444444400ff13334433443331f00000000ffffffffffff0000000000000440fffffffff000
+ffffffffffffff00444444440004440ffffff000fffff3ffff0d664444440440f13334433443331f00000000ffffffffffff0000000000000440fffffffff000
+fffffffffffff000444000444004440ffffff000ffff373ffff0664444444440f13333333333331f00000000ffffffffffff0044444444000000f00ffffff000
+ffffffffff000444440440044004440ffffff000ffff373fffff06666604460ff13344444444331f00000000ffffffffffff04444444440444440000fffff000
+fffffffff0444444440440044404440ffffff000f333773ffffff000006460fff11334444443311f00000000fffffffffff0004400000440044400000ffff000
+fffffff0044444444440000440044400fffff000377373ffffffffff0d660fffff113344443311ff00000000ffffffffff00444404400440044000000ffff000
+fffff004444444444444444040444400fffff000f37773ffffffffff0dd0fffffff1133333311fff00000000ffffffff00444444400004400000000000fff000
+fff00044444444444444444040444000fffff000ff3373fffffffffff00fffffffff11111111ffff00000000fffffff0044444444444404044000000000ff000
+ff004444444444444444440400444000fffff000ffff3fff0000000000000000ffffffffffffffff00000000ffffff00444444444444404004000000000ff000
 f004444440000000004444400044000ffffff000000000000000000000000000000000000000000000000000fffff0044444444444444040044000000000f000
 f04440000ffffff0400000000440000ffffff000000000000000000000000000000000000000000000000000ffff04444444444444444400444000000000f000
 04400ffffffffff004000000444000fffffff000000000000000000000000000000000000000000000000000fff0444444400000000000044440400000000000
 000fffffffffffff0444444440000400fffff000000000000000000000000000000000000000000000000000ff0444440000ff04000000044400400000000000
 ffffffffffffff000444444440000440fffff000000000000000000000000000000000000000000000000000f0444400fffff004444444444000440000000000
-ffffffffffffff04004400000044440000fff000000000000000000000000000000000000000000000000000044400ffffff0404444000000044400000000000
-ffffffffffffff04404444404400000000fff0000000000000000000000000000000000000000000000000000400ffffffff0400444444044400000000000000
-fffffffffffff0004044400000000000000ff000000000000000000000000000000000000000000000000000000ffffffff00040444000000000000000000000
-fffffffffffff00000444000000000000000f000000000000000000000000000000000000000000000000000fffffffffff00000444000000000000000000000
-ffffffffffff000000040000000000000000f000000000000000000000000000000000000000000000000000ffffffffff00000004000000000000000000f000
-ffffffffffff000000040000000000000000f000000000000000000000000000000000000000000000000000ffffffffff0000000400000000000000000ff000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+ffffffffffffff04004400000044440000fff00fffffffff333ffffffffffffffffffffff33333ff00000000044400ffffff0404444000000044400000000000
+ffffffffffffff04404444404400000000fff003333333ff3f3fff3333fffffffff3fffff3ffffff000000000400ffffffff0400444444044400000000000000
+fffffffffffff0004044400000000000000ff00f33ffff3f3f3fff3fff3ff3333ff3fffff3ffffff00000000000ffffffff00040444000000000000000000000
+fffffffffffff00000444000000000000000f00f3fffff3f3f333f3fff3ff3fffff3fffff333ffff00000000fffffffffff00000444000000000000000000000
+ffffffffffff000000040000000000000000f003ffffff3f3fff3f333333f3fffff3ff33ff3fffff00000000ffffffffff00000004000000000000000000f000
+ffffffffffff000000040000000000000000f0033fffff3ff3ffff3ffff3f33ffff333ffff33333300000000ffffffffff0000000400000000000000000ff000
+000000000000000000000000000000000000000f33333f3fffffff3fffffff333fffffffffffffff000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000fffff33ffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1060,136 +1225,136 @@ fffff000000fffff0000000000000000000000000000000000000000000000000000000000000000
 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffff000000
 __label__
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-cccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-ccceeeesseessessseseeesssesseessseeeeesseeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-ccceeesesesesesseeseeeeseesesesseeeeeeseseeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-ccceeesesessseseeeseeeeseeseseseeeeeeeseseeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-ccceeesseeseeeesseessessseseseesseeeeesseeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhhhhhcccccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccchh77777777hccccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccccccccchh77777777777hcccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccchh777777777777hcccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccch77hhhhhhhhh777hccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhhhhhhhhhh77hccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhhhhhhhhhh77hccccccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccchh77777777hhhhhhchhcccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccccch777777777h77777hhhhccccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccccccchhh77hhhhh77hh777hhhhhcccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccccchh7777h77hh77hh77hhhhhhcccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccccchh7777777hhhh77hhhhhhhhhhhccc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccccchh777777777777h7h77hhhhhhhhhcc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccccchh7777777777777h7hh7hhhhhhhhhcc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccccchh77777777777777h7hh77hhhhhhhhhc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccccch77777777777777777hh777hhhhhhhhhc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccccch7777777hhhhhhhhhhhh7777h7hhhhhhhc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccccch77777hhhhcch7hhhhhhh777hh7hhhhhhhc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccch7777hhccccchh7777777777hhh77hhhhhhc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccch777hhcccccch7h7777hhhhhhh777hhhhhhhc
-ccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeccccccccccccccccccccccccccccccccccccccccccch7hhcccccccch7hh777777h777hhhhhhhhhhc
-cccceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeecccccccccccccccccccccccccccccccccccccccccccchhhcccccccchhh7h777hhhhhhhhhhhhhhhhhc
-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhh777hhhhhhhhhhhhhhhhhc
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhhhh7hhhhhhhhhhhhhhhhhhc
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhhhh7hhhhhhhhhhhhhhhhhcc
+cssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssscccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7711111111117111117771111111111111111111111111777711111111111111177777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7117717771717177711111771177711771177177117771777117711771771177117777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7171117711717177117771717177117171717171711711777171117171717171717777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7111717111711171111111771171117771717177111711777171117771771171717777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7177111771177171111111717117717111771171711717777117717171717177117777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7111111111111111777771111111111111111111111117777111111111111111117777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7111171111111111777771111111111171111111111117777711111111111111177777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7711111111111111111111111111111111111111111111111111111111111111111111111111177scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7111111111111711111111777111117777111111117771111111111111117111111117111177777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7177711771771117717171777177717771177177717771777177717771717177717711177177777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7117117171717171717771777117117771717177717771771177117711717117117171711177777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7717117171717177711171777117117771777171717771711171117111711117117171717177777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7717117711771171717711777177717771717171717771717117711771177177717171777177777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7711111111111111111117777111117771111111117771117711111111111111111111111177777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777777777777ssssssssssssssssssss777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777sssss777ss77s7s7s777s777s777s777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777s777s777s7sss7s7s77ss77sss7ss777777777777777777777777766666666666666667777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777sssss777sss7s777s7sss7ssss7s7777777777777777777777777767777111111117767777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777s77ss777ss77ss77ss7s77777777777777777777777777677711eeeeee11767777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777ssssssssssssssssssss7777777777777777777777777767711eeeeeeee1167777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777777777777777777777777777777777777777777777777777777777776711eeeeeeeeee117777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777777777777777777777777777777777777777777777777777777777671eee77ee77eee17777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777777777777777777777777777777777777777777777777777777777671eee77ee77eee17777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77111111111111111111111111111111111111111111111111111117777671eee77ee77eee17777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777777777777777777777777777777777777777777777777777777777671eee77ee77eee17777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777777777777777777777777777777777777777777777777777777777671eeeeeeeeeeee17777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77777777777777777777777777777777777777777777777777777777777671ee77777777ee17777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777777777777777777777777777777777777777777777777777777777776711ee777777ee117777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777767711ee7777ee1167777scccccccccccccccccccccccccccccccccccccccccccccc
+cs71111111111117111111117771111177777777777777777777777777777677711eeeeee11767777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7177711771771117717171777177717777777777777777777777777777767777111111117767777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7117117171717171717771777117117777777777777777777777777777766666666666666667777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7717117171717177711171777117111117111711177777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7717117711771171717711777177711717171717177777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7711111111111111111117777111111117111711177777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss7777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s777ssssssssssssssssssss7777sssssssss777sssssssssssssssss77777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777s777s77ss777s777s77ss777s777s7s7s777s77ss777ss77s777s77777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7s777s7s777ss7ss7s7ss7ss77ss7s7s777s777s777s777s77ss77ss7ssss7ss77777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s7777s7ss77sss7ss7sss7s7s777s7s7sss7s777s7s7s7sssss7ss7s777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s7777s7ss7s7s777ss77s77ss777s7s7s77ss777s777ss77s77sss7s777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss7777sssssssssssssssssss7777ssssssss7777ssssssssssss7sss777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss7777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s777sssssssssss77sssssssssss7777sssssssssssssssss7777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777s7s7s777s7s7ss77s777s77ss777s777s777s77ss7s7s7777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7s777s7s777s7s7s77ss7s7s7s7s77ss7s7s777ss7sss7ss7s7s777s7777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777s777s7sss7sss777s7sss7s7s7777s7sss7ss7s7sss7s7777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s777s7s7ss77ss77s7ssss77s77ss7777s7ss777s77ss77ss7777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss777sssssssssssssss77sssssss77777sssssssssssssss77777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss7777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s777ssssssssssssssss7777sssssssss777ssssssssssssssssssssssss7ssss777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777s7s7ss77s777s77ss777s777s7s7s777s777ss77s77ss77ss777s77sss77s777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7s777s7s777s7s7s7sss77ss7s7s777s777s777s777s777s7s7s7s7s7s7s77ss7s7s7sss777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777s7s7sss7s7sss7s7s777s7s7sss7s777s7s7s777s7s7s7s7s7sss77ssss7s777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s777ss77s77sss77s77ss777s7s7s77ss777s7s7s7s7s7s7s7s7ss77s7s7s77ss777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss7777sssssss7sssssss7777ssssssss7777ssssssssssssssssssssssssssss7777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss7777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s7777ssssssssssss7777ssssss7sss77777sssssssss777ssssssssssssssss7777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777ss77s777s777s777ss77s7s7s7s77777s777s7s7s777s777ss77ss77s77ss777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7s777s7s777s7s7ss7ss77ss777s7s7s7s7s7s77777s777s777s777s77ss7s7s7s7s7s7s777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777s777ss7ss7sss777s777s7sss7sss777s7s7sss7s777s7sss7s7s7s7s7s7s777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s777s7s7ss7sss77s777s7s7ss77ss77s777s7s7s77ss777s7s7s77ss77ss77ss777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss777ssssssss7ssss777sssssssssssss777ssssssss7777sss7ssssssssssss7777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss7777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s7777sssssssssssssssssssssss7777ssssssssssssssssssssssssssss77777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777ss77s777ss77s7s7s777s77ss777s777ss77ss77s7s7ss77s777s77ss7777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7s777s7s777s7ssss7ss7s7s777s77ss7s7s777s77ss7s7s7sss7s7s7sss77ss7s7s7777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s7ss7ss7s777sss7ss7ss777sss7s7sss7s7s777s7sss7s7s7sss7s7sss7s7sss7s7s7777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777s77s7s77s777s77sss7ss7s7s77sss77s77ss777s7s7s77sss77ss77s77sss77s77ss7777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs777ssss7ssss777ssss7sssssssssss7sssssss7777sss7ssss7sssssssssss7sssssss77777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7711111111111111111111111111111111111111111111111111111111111111111111111111177scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777eee7777777777777777777777eeeee777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777eeeeeee77e7e777eeee777777777e77777e7777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77711111111111111111111111711177777ee7777e7e7e777e777e77eeee77e77777e7777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77117717771177177117771771117177777e77777e7e7eee7e777e77e77777e77777eee77777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7717111171171117171771171711117777e777777e7e777e7eeeeee7e77777e77ee77e777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7711171171171717171711171711717777ee77777e77e7777e7777e7ee7777eee7777eeeeee7777scccccccccccccccccccccccccccccccccccccccccccccc
+cs77177117771777171711771771111177777eeeee7e7777777e7777777eee7777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs771111111111111111111111111111777766666ee66666666666666666666666666666666667777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7711111111111111111111111177777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccccccccccccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777scccccccccccccccccccccccccchhhhhhcccccccccccccc
+cs7777777777777777777777777777777777777777777777777777777777777777777777777777777sccccccccccccccccccccccchhhh7777hhhcccccccccccc
+cssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssscccccccccccccccccccccchh777777777hhccccccccccc
+chhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhcccccccccccccccccccccch777hhhhh777hhcccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccch77hhhhhhhh777hhccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccch7hhhhhhhhhh777hccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhh77777hhhh777hhcccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhh7777777hhh777hcccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchh77777777hhh777hcccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhh777hhh777hh777hcccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhh77777h77hh77hh777hcccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccch77777777h77hh777h777hcccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchh7777777777hhhh77hh777hhccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchh7777777777777777h7h7777hhccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhh77777777777777777h7h777hhhccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchh777777777777777777h7hh777hhhccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchh777777hhhhhhhhh77777hhh77hhhcccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccch777hhhhcccccch7hhhhhhhh77hhhhcccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccch77hhcccccccccchh7hhhhhh777hhhccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhccccccccccccch77777777hhhh7hhccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhh77777777hhhh77hccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccch7hh77hhhhhh7777hhhhccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccch77h77777h77hhhhhhhhccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhh7h777hhhhhhhhhhhhhhcccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhh777hhhhhhhhhhhhhhhccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhhhh7hhhhhhhhhhhhhhhhccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccchhhhhhh7hhhhhhhhhhhhhhhhccc
 hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh777hhhhhhhhhhhhhhhhhh
 hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh7hhhhhhhhhhhhhhhhhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-hhhhchchcchhccchccchcchhcchhccchhcchchchccchccchccchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-hhhhchchchchhchhcchhchchchchhchhchhhchchhchhcchhhchhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhhh
-hhhhchchchchhchhchhhcchhcchhhchhchhhccchhchhchhhhchhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhcchchchhchhhcchchchchchccchhcchchchhchhhcchhchhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeesssesssesssessseessessseesseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhcchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeseeeseeeseeeseeeseeeeseeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchchccchchchccchhcchhcchchchhhhhhhhhhhhhhhhhhhhhhhhhheeesseesseesseesseeseeeeseessseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchchcchhchchhchhchhhchhhchchhhhhhhhhhhhhhhhhhhhhhhhhheeeseeeseeeseeeseeeseeeeseeeeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchchchhhchchhchhhhchchhhccchhhhhhhhhhhhhhhhhhhhhhhhhheeessseseeeseeessseesseeseesseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhccchhcchhcchhchhcchhhcchchchhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeessssssssssssssssssssssssseeseessssssssssssssssssssssssseeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeessseeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhchhhhcchchchccchcchhhcchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhchhhchchchchcchhchchchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhchhhchchccchchhhcchhhhchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhcchcchhccchhcchchchcchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee777e777ee77e777e7e7eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee77ee777e7e7ee7ee777eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee7eee7e7e777ee7eeee7eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhcchhcchccchhcchhcchcchhhhhhcchhccchhcchhhhhhhhhhhhhheeeee77e7e7e7eeee7ee77eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchchchchhchhchhhchchchchhhhhchchcchhchhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhccchchchhchhhhchchchchchhhhhcchhchhhhhchhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchhhcchhccchcchhcchhchchhhhhchchhcchcchhhhhhhhhhhhhhheeeeeeee777e77eee77e77ee777e77ee777e777e77ee777eeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeee7ee7e7e7eee7e7e77ee7e7ee7ee77ee7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeee7ee7e7e7e7e77ee7eee7e7ee7ee7eee7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeee777e7e7e777e7e7ee77e77ee777ee77e7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhccchhcchhcchccchchhhccchccchhcchccchccchhcchhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhcchhchchchhhhchhchhhhchhhchhchchhchhcchhchhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhchhhccchchhhhchhchhhhchhhchhccchhchhchhhhhchhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhchhhchchhcchccchhcchccchhchhchchhchhhcchcchhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee777e777ee77e777e7e7eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee77ee777e7e7ee7ee777eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhcchhcchcchhccchccchcchhccchcchhhcchccchhhhhhhhhhhhhheeee7eee7e7e777ee7eeee7eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchhhchchchchcchhhchhchchcchhchchchhhcchhhhhhhhhhhhhhheeeee77e7e7e7eeee7ee77eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchhhchchchchchhhhchhchchchhhchchchhhchhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhcchcchhchchchhhccchcchhhcchchchhcchhcchhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeee777e77eee77e77ee777e77ee777e777e77ee777eeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeee7ee7e7e7eee7e7e77ee7e7ee7ee77ee7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeee7ee7e7e7e7e77ee7eee7e7ee7ee7eee7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhccchhcchhcchccchccchhhhhhcchccchhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeee777e7e7e777e7e7ee77e77ee777ee77e7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhhchhchchchhhhchhcchhhhhhchchcchhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhchhccchhhchhchhchhhhhhhchchchhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhchhchchcchhhchhhcchhhhhcchhchhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee777e777ee77e777e7e7eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhcchcchhhcchcchhhcchccchhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee77ee777e7e7ee7ee777eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchchchchchchchchchhhcchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeee7eee7e7e777ee7eeee7eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhchchcchhccchchchchchchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeee77e7e7e7eeee7ee77eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhcchhchchchchchchccchhcchhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeee777e77eee77e77ee777e77ee777e777e77ee777eeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeee7ee7e7e7eee7e7e77ee7e7ee7ee77ee7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeee7ee7e7e7e7e77ee7eee7e7ee7ee7eee7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeee777e7e7e777e7e7ee77e77ee777ee77e7e7ee7eeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehhhhh
-7777hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-77777hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-77777hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-e7777hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-e7777hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-eee77ccccc111ccccccccccccc111ccccccccccccc111ccccccccccccc111ccccccccccccc111ccccccccccccc111ccccccccccccc111ccccccccccccc111ccc
-e7e77sssssccc1ssssssssssssccc1ssssssssssssccc1ssssssssssssccc1ssssssssssssccc1ssssssssssssccc1ssssssssssssccc1ssssssssssssccc1ss
-hhe77sshhhsssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1s
-77h77hh677hsssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1
-777hh67h677hsssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc
-67777h67777hsssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc
-h67777777677hsssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssss
-7h6777767767hsssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssssc1ssssssssssssss
-7hh677776777hsss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss
-ehss67777777hhss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss
-chs66777777h77h1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1
-csh66777777777h1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1
-sssh66666h776h1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1c
-sssshhhhh676h1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cssssssssssssss1cs
-ssssssshs66h1cssssssssssss111cssssssssssss111cssssssssssss111cssssssssssss111cssssssssssss111cssssssssssss111cssssssssssss111css
-eeeeeeehssheeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
 
 __sfx__
-000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1237,19 +1402,19 @@ __sfx__
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010900001661413055130001300013000247053370500705007050070500705007050070500705007050070500705007050070500705007050070500705007050070500705007050070500705007050070500000
+011000001661415055150001500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+011000001661417055170001700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+011000001661419055190001900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01100000166141b0551b0001b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01100000166141d0551d0001d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01100000166141f0551f0001f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01080000180451c0451f045180451c0451f045180451c0451f045180351c0351f025180251c0251f015180151c0151f015180151c0001f000180001c0001f000180001c0001f0000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000400001b6500f5501f6501b550176500364012640166300f6300a6200a610000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00090000167551b7552775527705057051f7052470533705007050070500705007050070500705007050070500705007050070500705007050070500705007050070500705007050070500705007050070500705
+000500000b6240b634100141a5041a6040e5040e5040f6040d6041260412604126041260412604126042460428604006040060400604006040060400604006040060400604006040060400604006040060400604
+000500000f11300103001031813300103001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103001030010300103
+9d0600000b635005010b7310050100501005010050100501005010050100501005010050100501005010050100501005010050100501005010050100501005010050100000000000000000000000000000000000
 00010000197300e720207000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 910300001251500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505
 910300001551500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505005050050500505
