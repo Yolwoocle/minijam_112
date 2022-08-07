@@ -96,7 +96,7 @@ function _init()
 	spawn_wait_time=80
 	conveyor_speed_original=0.2
 	conveyor_speed=conveyor_speed_original
-	conveyor_active=true
+	conveyor_active=false
 
 	ailment_manager=
 	{
@@ -122,7 +122,8 @@ function _init()
 
 	doctor_oy = 0
 
-	new_ailment()
+	--new_ailment()
+	new_dialogue("I CANT WAIT TO ","HELP"," PEOPLE TODAY !")
 
 	g_ingredients={
 		{
@@ -139,10 +140,13 @@ function _init()
 	-- clock=maxclock
 
 	report_shifted_on_left = false
-	main_menu = true
 
+	bubbles_on_foreground = false
 	time_before_confetti=-1
 
+	spoon={
+		dobj=create_dobj(0,0)
+	}
 	-- if(debugmode) parse_speed = 1
 end
 
@@ -187,8 +191,8 @@ function _update60()
 	if time_before_confetti==0 then
 	-- if btnp(❎) then
 		for i=1,30 do
-			spawn_confetti(5,-10, 10+rnd(60), -10-rnd(50), 0.05+rnd(0.1))
-			spawn_confetti(128+5,-10, -10-rnd(60), -10-rnd(50), 0.05+rnd(0.1))
+			spawn_confetti(-5,-10, 10+rnd(80), -10-rnd(50), 0.05+rnd(0.1))
+			spawn_confetti(128+5,-10, -10-rnd(80), -10-rnd(50), 0.05+rnd(0.1))
 		end
 	end
 
@@ -265,7 +269,7 @@ function _draw()
 	-- draw logo
 	draw_logo()
 	
-	if(c.mode=="report")draw_bubbles()
+	if(bubbles_on_foreground)draw_bubbles()
 
 	if(debugmode)print("debug",1,dy(cam.dobj),8)
 end
@@ -489,25 +493,28 @@ function update_time()
 		anim_to_point(report, report.target_x, nil, 0.9)
 	end
 
-	if(time_since_last==720)anim_to_point(c,_x+10,_y+25)
+	if(time_since_last==720)anim_to_point(c,_x+10,_y+25,0.9)
 
 	--report card input loop
 	if(time_since_last>750 and time_since_last>report.last_input+60 and btnp(❎)) then
+		local c_anim_speed=0.9
 
 		if(report.step==1)report.adj1=rnd(positive_adj)
 		if(report.step==2)report.sticker_ox=-3+rnd(6)report.sticker_oy=-3+rnd(6)report.sticker=true
 		if(report.step>2 and report.step<=7)report.cur_mark+=1
 		if(report.step==8)report.signature=true
 
-		if(report.step!=0)sfx(47+report.step)shake=0.1
-		if(report.step==8)sfx(55)shake=0.2
+		if(report.step<9)then
+			if(report.step!=0)sfx(47+report.step)shake=0.1
+			if(report.step==8)sfx(55)shake=0.2
+		end
 
-		if(report.step==1)anim_to_point(c,_x+70,_y+30,0.9)
-		if(report.step>=2 and report.step<=6)anim_to_point(c,_x+7,_y+45+((report.step-2)*8),0.9)
-		if(report.step==7)anim_to_point(c,_x+50,_y+90,0.9)
-		
-		if(report.step==8)anim_to_point(c,_x+50,_y+100,0.9) --move hand away after signature
-		if(report.step==8)time_before_confetti=50
+		if(report.step==1)anim_to_point(c,_x+70,_y+30,c_anim_speed)
+		if(report.step>=2 and report.step<=6)anim_to_point(c,_x+8,_y+45+((report.step-2)*8),c_anim_speed)
+		if(report.step==7)anim_to_point(c,_x+50,_y+90,c_anim_speed)
+		if(report.step==8)anim_to_point(c,_x+50,_y+100,c_anim_speed) --move hand away after signature
+	
+		if(report.step==8)time_before_confetti=50 bubbles_on_foreground=true
 
 		report.last_input=time_since_last
 		report.step+=1
@@ -560,7 +567,7 @@ function draw_pdoctor()
 end
 
 function draw_logo()
-	sspr(0,100,91,28,dx(logo.dobj),dy(logo.dobj)+sin((t*0.5)/120)*3*0.99)
+	sspr(0,100,91,28,dx(logo.dobj),dy(logo.dobj)+sin((t*0.5)/120)*3.99)
 end
 
 function draw_ticks()
@@ -815,17 +822,23 @@ function update_anim()
 end
 
 function on_speech_end()
-	if intro_phase==0 and parsing==false and c.mode=="menu" and btnp(❎) then
-		intro_phase=1
+	if intro_phase==0 and parsing==false and c.mode=="menu" then
+		if btnp(❎) then
+			intro_phase=1
 
-		anim_to_point(cam, 0,0, 0.9)
-		anim_to_point({dobj=bubble_dobj}, 0,0, 0.9)
-		speech_arrow_up=true
-		c.mode="ingredients"
+			anim_to_point(cam, 0,0, 0.9)
+			anim_to_point({dobj=bubble_dobj}, 0,0, 0.9)
+			speech_arrow_up=true
+			
+			new_ailment()
 
-		clock=0
+			return_to_belt()
 
-		time_since_last=0
+
+			clock=0
+
+			time_since_last=0
+		end
 	end
 end
 
@@ -1308,10 +1321,10 @@ ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 5555222155555555fffff111111ffffffffff111111ffffffffff111111ffffffffff111111ffffffffff111111ffffffffffffffffff2222211111111000000
 5555555215555555fff1113333111ffffff1113333111ffffff1113333111ffffff1113333111ffffff1113333111ffffffffffff22221111111111111000000
 5555555521555555ff11d333333d11ffff11d333333d11ffff11d333333d11ffff11d333333d11ffff11d333333d11fffffffff2211111111111111111000000
-5555555552155555ff1d33333333d1ffff1d33333333d1ffff1d33333333d1ffff1d34333343d1ffff1d33333333d1fffffff221111111111333333333000000
-5555555552155555f11334333343311ff11444333344411ff11334333343311ff11344433444311ff11334433443311fffff2111111333333333333333000000
-5555555555215555f13344433444331ff13334433443331ff13344433444331ff13344433444331ff13334433443331ffff21111333333333333333333000000
-5555555555215555f13343433434331ff13344433444331ff13343433434331ff13334333343331ff13334433443331fff211133333333333333333333000000
+5555555552155555ff1d33333333d1ffff1d33333333d1ffff1d33333333d1ffff1d33333333d1ffff1d33333333d1fffffff221111111111333333333000000
+5555555552155555f11334333343311ff11444333344411ff11334333343311ff11334433443311ff11334433443311fffff2111111333333333333333000000
+5555555555215555f13344433444331ff13334433443331ff13344433444331ff13334433443331ff13334433443331ffff21111333333333333333333000000
+5555555555215555f13343433434331ff13344433444331ff13343433434331ff13334433443331ff13334433443331fff211133333333333333333333000000
 5555555555125555f13333333333331ff13333333333331ff13333333333331ff13333333333331ff13334433443331ff2111333333333333333333333000000
 5555555555125555f13344444444331ff13334444443331ff13343333334331ff13344444444331ff13433333333431ff2111433333333333333333333000000
 5555555551255555f11344444444311ff11334444443311ff11334444443311ff11344444444311ff11344333344311ff2111143333333333333333333000000
