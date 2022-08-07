@@ -184,8 +184,8 @@ function _update60()
 	
 	-- spawn confetti
 	if(time_before_confetti >-1)time_before_confetti-=1
-	-- if time_before_confetti==0 then
-	if btnp(❎) then
+	if time_before_confetti==0 then
+	-- if btnp(❎) then
 		for i=1,30 do
 			spawn_confetti(-5,-10, 10+rnd(80), -10-rnd(50), 0.05+rnd(0.1))
 			spawn_confetti(128+5,-10, -10-rnd(80), -10-rnd(50), 0.05+rnd(0.1))
