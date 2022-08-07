@@ -7,7 +7,7 @@ __lua__
 -- main
 
 debug=""
-debugmode=true
+debugmode=false
 
 sound_on=true
 
@@ -44,6 +44,11 @@ function _init()
 		cur_mark=0,
 
 		signature=false,
+	}
+
+	logo={
+		default_x=18,
+		dobj=create_dobj(18,-80),
 	}
 	
 	c={
@@ -243,10 +248,7 @@ function _draw()
 	end
 
 	-- draw logo
-	if (main_menu) then
-		local camy = dy(cam.dobj)
-		sspr(0,100,91,28, 18,camy+18 + sin(t/120)*3*0.99)
-	end
+	draw_logo()
 	
 	if(debugmode)print("debug",1,dy(cam.dobj),8)
 end
@@ -272,7 +274,6 @@ function update_dead_list()
 		for i=1,#fit do
 			if(sub(fit,i,i)=="\n")h+=1
 		end
-		list_h+=h
 	end
 
 	dead_list_obj.dobj._y=-110
@@ -445,6 +446,8 @@ function update_time()
 		clock=0
 		conveyor_active=false
 
+		logo.dobj.wx=130
+
 		--anim_to_point(c,,130,0.97)
 
 		dialogue_queue=pack("LOOKS LIKE IT'S TIME TO CLOSE UP SHOP ","","")
@@ -542,6 +545,10 @@ function draw_pdoctor()
 	pset(_x+19,_y+28+oy,4)
 	pset(_x+20,_y+27+oy,4)
 	pset(_x+18,_y+27+oy,4)
+end
+
+function draw_logo()
+	sspr(0,100,91,28,dx(logo.dobj),dy(logo.dobj)+sin((t*0.5)/120)*3*0.99)
 end
 
 function draw_ticks()
