@@ -136,7 +136,7 @@ function _init()
 
 	clock=0
 	maxclock=60*10 -- be careful about overflowing the tiny p8 limit
-	clock=maxclock
+	-- clock=maxclock
 
 	report_shifted_on_left = false
 	main_menu = true
