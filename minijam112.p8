@@ -7,7 +7,7 @@ __lua__
 -- main
 
 debug=""
-debugmode=false
+debugmode=true
 
 sound_on=true
 
@@ -21,7 +21,7 @@ function _init()
 	
 	--camera
 	shake=0
-	intro_phase=0
+	in_menu=true
 	cam={
 		dobj=create_dobj(0,-91),
 	}
@@ -84,7 +84,7 @@ function _init()
 		target_y=40,
 	}
 
-	dead_list=""
+	dead_list={to_fit("LOUIE CHAPMAN WAS NEVER SEEN AGAIN",11)}
 	dead_list_obj={
 		dobj=create_dobj(128,0)
 	}
@@ -92,11 +92,9 @@ function _init()
 
 	bubbles={}
 
-	st=0 --spawn time
-	spawn_wait_time=80
-	conveyor_speed_original=0.2
-	conveyor_speed=conveyor_speed_original
-	conveyor_active=false
+	conveyor_time=0 --conveyor time
+	conveyor_mod_val=3
+	spawn_rate=60
 
 	ailment_manager=
 	{
@@ -120,23 +118,19 @@ function _init()
 
 	ingr_particles={}
 
-	doctor_oy = 0
+	doctor_oy=0
 
 	--new_ailment()
 	new_dialogue("I CANT WAIT TO ","HELP"," PEOPLE TODAY !")
 
 	g_ingredients={
-		{
-			obj=generate_ingredient(),
-			dobj=create_dobj(-20,flr(rnd(10)+95))
-		},
 	}
 
 	bubble_dobj=create_dobj(0,-10)
 	speech_arrow_up=false
 
 	clock=0
-	maxclock=60*10 -- be careful about overflowing the tiny p8 limit
+	maxclock=60*30 -- be careful about overflowing the tiny p8 limit
 	-- clock=maxclock
 
 	report_shifted_on_left = false
@@ -147,20 +141,21 @@ function _init()
 	spoon={
 		dobj=create_dobj(0,0)
 	}
-	-- if(debugmode) parse_speed = 1
 end
 
 function _update60()
 	t+=1
 	
+
 	update_time()
 	on_speech_end()
 
 	if(report_shifted_on_left) dead_list_obj.dobj.oy-=1/6
 
 	menuitem(3, "sound: "..(sound_on and "on" or "off"), function() sound_on=not sound_on end)
+	menuitem(4, "end day", function() clock=maxclock-2 end)
 
-	if(conveyor_active)st+=1 --only iterate spawn timer is the conveyor is active
+	if(conveyor_active)conveyor_time+=1 --only iterate spawn timer is the conveyor is active
 	time_since_last+=1
 
 	if dialogue_queue!="" and time_since_last>dialogue_queue_time then
@@ -196,7 +191,6 @@ function _update60()
 		end
 	end
 
-	conveyor_spawner()
 	
 	update_cursor()
 	animate_ingredients()
@@ -206,6 +200,10 @@ function _update60()
 	
 	parse_dialogue()
 	update_anim()
+
+
+
+	conveyor_spawner()
 end
 
 function _draw()
@@ -220,67 +218,111 @@ function _draw()
 	
 	draw_conveyor()
 
-	
 	draw_effects()
-	
-	draw_ingredients()
-	draw_ingr_particles()
-	
-	local _text="potion of"
-	local _y=dy(potion.dobj)
-	text_bold2(_text,hcentre(_text)-35,_y,4,5)
-	text_bold2(pot.name,hcentre(pot.name)-35,_y+7,4,5)
 
-	selected_effects()
+	draw_potion_names()
+
+	if not in_menu then
+
+		draw_ingredients()
+		draw_ingr_particles()
+		selected_effects()
+	end
 
 
-	-- rectfill(-5,-5,135,34,2)
 	rectfill(-5,-120,135,34,2)
 
+
+	draw_time()
+
 	draw_report()
-
-	if(intro_phase>=1) draw_time()
-
-	-- draw dead list
-	local x,y=dx(dead_list_obj.dobj),dy(dead_list_obj.dobj)
-	rrect(x,-87+1,61,90,1)
-	rrect(x,-87  ,61,90,4)
-	print(dead_list,x+1,y,5)
-	-- foreground (to hide list)
-	rectfill(x,-91,128,-88, 2)--blue top
-	rectfill(x,5,128,3+31, 2)--blue bottom
-	rectfill(x+1,4,128,4, 0)--lback shadow
-	rectfill(x,35,128,37, 0)--black bottom
+	draw_dead_list()
 	
 	draw_pdoctor()
 	draw_bubble()
-
 	draw_ticks()
-	
 	
 	draw_cursor()
 	
-	-- draw dialogue / bubble / speech
+	--draw dialogue / bubble / speech
 	if(not hide_bubble)then
 		print(parse_output,6,5+dy(bubble_dobj),5)
 		print(ailment_out,6,5+dy(bubble_dobj),3)
 	end
 
-	-- draw logo
 	draw_logo()
 	
 	if(bubbles_on_foreground)draw_bubbles()
 
-	if(debugmode)print("debug",1,dy(cam.dobj),8)
+	if(debugmode)print(debug,1,dy(cam.dobj),8)
+end
+
+
+function init_and_start_round()
+	in_menu=false
+	
+	--reset clocks
+	clock=0
+	time_since_last=0
+	conveyor_time=0
+	
+	--animate stuff
+	anim_to_point(cam, 0,0, 0.9)
+	anim_to_point({dobj=bubble_dobj}, 0,0, 0.9)
+	speech_arrow_up=true
+
+	--this is scuffed as fuck don't tell yol
+	c.dobj.wx=-30
+	c.dobj.wy=100
+	
+	add(g_ingredients,object)
+
+	--get new ailment and return to belt
+	new_ailment()
+	return_to_belt()
 end
 
 -->8
 --update
 
+function draw_potion_names()
+	local _text="potion of"
+	local _y=dy(potion.dobj)
+	text_bold2(_text,hcentre(_text)-35,_y,4,5)
+	text_bold2(pot.name,hcentre(pot.name)-35,_y+7,4,5)
+end
+
+function draw_dead_list()
+	-- draw dead list
+	local x,y=dx(dead_list_obj.dobj),dy(dead_list_obj.dobj)
+	--local x,y=30,dy(dead_list_obj.dobj)
+
+	rrect(x,-87+1,61,90,1)
+	rrect(x,-87  ,61,90,4)
+
+	local _x=x+1
+	local text_gap=35
+	local scroll=t*0.1
+	for i=0,#dead_list-1 do
+		local y_pos=(i*text_gap)
+		local y_pos=(y_pos-scroll)%(text_gap*#dead_list)
+		print(dead_list[i+1],x+1,-120+y_pos,5)
+	end
+
+	--print(dead_list,x+1,y,5)
+
+
+
+	-- foreground (to hide list)
+	rectfill(x,-91,128,-88, 2)--blue top
+	rectfill(x,5,128,3+31, 2)--blue bottom
+	rectfill(x+1,4,128,4, 0)--lback shadow
+	rectfill(x,35,128,37, 0)--black bottom
+end
+
 function update_dead_list()
-	local out=" "
-	local ways_to_die=split" WAS NEVER SEEN AGAIN, STILL GETS NIGHTMARES, HASNT STOPPED CRYING,S FAMILY MISSES THEM, NEVER MADE IT HOME, WILL NEVER RETURN, DIED A GRUESOME DEATH, LEFT THEIR WALLET, NOW SUFFERS FROM ANXIETY, HASNT EATEN IN DAYS, WAS ARRESTED, IS NOW IN JAIL, SUFFERED A FATE WORSE THAN DEATH, IS NOT THE SAME ANYMORE, COULDNT HANDLE OUR STRONGEST POTIONS"
-	local died_of_variations=split" DIED OF , PERISHED OF "
+	local ways_to_die=split" WAS NEVER SEEN AGAIN, STILL GETS NIGHTMARES, HASNT STOPPED CRYING,S FAMILY MISSES THEM, NEVER MADE IT HOME, WILL NEVER RETURN, DIED A GRUESOME DEATH, LEFT THEIR WALLET, IS SUFFERING ANXIETY, HASNT EATEN IN DAYS, WAS ARRESTED, IS NOW IN JAIL, SUFFERED A FATE WORSE THAN DEATH, IS NOT THE SAME ANYMORE, COULDNT HANDLE OUR STRONGEST POTIONS"
+	local died_of_variations=split" DIED OF "
 	for customer in all(past_customers) do
 		--if customer.score<0 then
 		--	out..=to_fit(customer.name.." DIED OF "..customer.cause.."\n\n",14)
@@ -288,12 +330,18 @@ function update_dead_list()
 		local fate=rnd(ways_to_die)
 		if(flr(rnd(2))==0)fate=rnd(died_of_variations)..customer.cause
 		local fit=to_fit(customer.name..fate.."\n\n",11)
-		out..=fit
+		add(dead_list,fit)
+	end
+
+
+	if #dead_list!=0 then
+		while(#dead_list<4) do
+			add(dead_list,rnd(dead_list))
+		end
 	end
 
 	dead_list_obj.dobj._y=200
 	dead_list_obj.dobj.oy=0
-	dead_list=out
 end
 
 function return_to_belt()
@@ -305,8 +353,9 @@ end
 
 function animate_ingredients()
 	for ingredient in all(g_ingredients) do
-		local speed=conveyor_speed
-		ingredient.dobj.wx+=speed
+		local offset=0
+		if(conveyor_time%conveyor_mod_val==0 and conveyor_active)offset=1
+		ingredient.dobj.wx+=offset
 		
 		--destroy ingredient if it goes off screen
 		if ingredient.dobj.wx>128 then
@@ -332,7 +381,7 @@ function update_cursor()
 			local ingr=g_ingredients[c.sel_index]
 			anim_to_point(c,dx(ingr.dobj)+ox,dy(ingr.dobj)+oy,0.9)
 		
-			if btnp(❎) and time_since_last>30 then
+			if btnp(❎) and time_since_last>30 and #g_ingredients>1 then
 				local a_in={
 					dobj=ingr.dobj,
 					_s=ingr.obj._s,
@@ -354,12 +403,6 @@ function update_cursor()
 
 				anim_to_point(cur_fx_dobj,nil,10)
 
-				local object={
-					obj=generate_ingredient(),
-					dobj=create_dobj(-20,95+rnd(10))
-				}
-				add(g_ingredients,object)
-
 				del(g_ingredients,ingr)
 				commit_ingredient(ingr.obj)
 
@@ -379,7 +422,7 @@ end
 --spawns objects onto the
 --conveyor
 function conveyor_spawner()
-	if st%spawn_wait_time==0 and conveyor_active then
+	if conveyor_time%spawn_rate==0 and conveyor_active then
 		local object={
 			obj=generate_ingredient(),
 			dobj=create_dobj(-20,95+rnd(10))
@@ -465,7 +508,7 @@ function update_time()
 
 		--anim_to_point(c,,130,0.97)
 
-		dialogue_queue=pack("LOOKS LIKE IT'S TIME TO CLOSE UP SHOP ","","")
+		dialogue_queue=pack("LOOKS LIKE ITS TIME TO CLOSE UP SHOP ","","")
 		dialogue_queue_time=30
 		time_since_last=0
 	end
@@ -496,7 +539,7 @@ function update_time()
 	if(time_since_last==720)anim_to_point(c,_x+10,_y+25,0.9)
 
 	--report card input loop
-	if(time_since_last>750 and time_since_last>report.last_input+60 and btnp(❎)) then
+	if(time_since_last>750 and time_since_last>report.last_input+30 and btnp(❎)) then
 		local c_anim_speed=0.9
 
 		if(report.step==1)report.adj1=rnd(positive_adj)
@@ -532,19 +575,41 @@ function update_time()
 end
 
 function draw_time()
-	if(c.mode=="report")return -- "this is scuffed as fuck I hate this line" - Louie
+	if(in_menu)return -- "this is scuffed as fuck I hate this line" - Louie
 
+	local time_percentage=(clock/maxclock)*100
+	
+	local start_time,end_time=9,17
+	local shift_length=end_time-start_time
+	local h_length=(100/shift_length)
+	local h_hand=(start_time+((time_percentage\h_length)%12))
+	
+	local m_hand=15*(flr((time_percentage/(h_length)*60)%60)\15)
+
+	debug=h_hand..":"..m_hand
+
+
+
+
+
+	--[[
 	local leftt = maxclock - clock
 	local leftsecs= leftt\60
 	local timesec = leftsecs%60
 	local timemin = leftsecs\60
-	local m = sub("000"..tostr(flr(timesec)), -2,-1)
-	local h = sub("   "..tostr(flr(timemin)), -2,-1)
+	
+	]]--
+
+	local _end="AM"
+	if(h_hand<start_time)_end="PM"
+
+	local m = sub("000"..tostr(flr(m_hand)), -2,-1)
+	local h = sub("   "..tostr(flr((h_hand-1)%12)+1), -2,-1)
 	
 	-- flashing text
-	ocol = 4
-	if (leftsecs<=30 and t%60<=30) ocol=3
-	text_bold(h..":"..m,105,3, 0,ocol)
+	local ocol = 4
+	if (time_percentage>90 and t%60<=30) ocol=3
+	text_bold(h..":"..m.._end,99,3, 0,ocol)
 end
 
 -->8
@@ -603,7 +668,7 @@ end
 function draw_conveyor()
 	local _y=105
 	for i=0,10 do
-		local _x=-20+(i*16)+(st*conveyor_speed)%16
+		local _x=-20+(i*16)+(conveyor_time\conveyor_mod_val)%16
 		sspr(0,64,16,16,_x,_y)
 	end
 	line(-5,_y+15,130,_y+15,3)
@@ -668,6 +733,8 @@ function draw_ingredients()
 end
 
 function selected_effects()
+	if(#g_ingredients==0)return
+
 	local _y=dy(cur_fx_dobj.dobj)
 	local ingredient=g_ingredients[c.sel_index]
 	for i=1,#ingredient.obj.effects do
@@ -678,11 +745,6 @@ function selected_effects()
 end
 
 function animate_score_mode()
-	conveyor_speed=conveyor_speed_original
-	if(not conveyor_active)conveyor_speed=0
-
-	--debug=time_since_last
-
 	if(c.mode!="pot")return 
 
 	if(time_since_last>30)anim_to_point(potion,30,potion.target_y)
@@ -760,9 +822,6 @@ function generate_ingredient()
 			add(gen_ingr.effects_modified,to_fit(effect,12," "))
 		end
 	end
-	
-	spawn_wait_time=st+flr(rnd(100))+20
-	--st=0
 
 	return gen_ingr
 end
@@ -822,22 +881,9 @@ function update_anim()
 end
 
 function on_speech_end()
-	if intro_phase==0 and parsing==false and c.mode=="menu" then
+	if in_menu and parsing==false and c.mode=="menu" then
 		if btnp(❎) then
-			intro_phase=1
-
-			anim_to_point(cam, 0,0, 0.9)
-			anim_to_point({dobj=bubble_dobj}, 0,0, 0.9)
-			speech_arrow_up=true
-			
-			new_ailment()
-
-			return_to_belt()
-
-
-			clock=0
-
-			time_since_last=0
+			init_and_start_round()
 		end
 	end
 end
@@ -1217,12 +1263,10 @@ all_solutions={
 	"BOREDOM|TURNS INTO A SWORD,INSTANT DEATH,INSTILLS PARANOIA,JUST GETS YOU STONED,EMITS 5G SIGNAL,AMPLIFIES TINNITUS,TURNS URINE GREEN,SETS YOU ON FIRE,REJUVENATES HAIR GROWTH,FINDS KEYS",
 	"AGGRESSIVE SEALIFE|INCREASES STRENGTH,FACILITATES CONFIDENCE",
 	"HUNGER|FIGHTS POVERTY,SUMMONS GIANT PEACH,FACILITATES DIGESTION,HIGH IN VITAMIN C,REMOVES TASTE,TASTES OF ORANGE,JUST GETS YOU STONED",
-	"NOT BEING TO HANDLE OUR STRONGEST POTION|TURNS INTO DRAGON,RAISES HP,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STRENGTH,FACILITATES DIGESTION,",
 	"DISCOVERING DYNAMITE|INCREASES RESISTANCE,RAISES HP,STRENGTHENS BONE MARROW,HARDENS SKIN",
 	"CONSTIPATION|FACILITATES DIGESTION,TURNS INTO A TOAD,TASTES LIKE MILK",
 	"POVERTY|INCREASES INTELLIGENCE,TURNS INTO A TOAD,INCREASES CHARISMA,FACILITATES CONFIDENCE,FIGHTS POVERTY",
 	"BEING UGLY|INCREASES STEALTH,INCREASES CHARISMA,JUST GETS YOU STONED",
-	-- "COMEDY|BREAKS FOURTH WALL",
 }
 
 titles=split"SIR,COUNT,BARON VON,DUCHES,PRINCE,KING,QUEEN,DOCTOR"
@@ -1240,8 +1284,8 @@ result_dialogue={
 	split",HAS NEVER FELT THIS, BEFORE !",
 	split",WILL LIKELY SUFFER A, DEATH !",
 	split"YOU THOUGHT ,WAS,.",
-	split",CAN'T STOP THINKING ABOUT HOW, YOU WERE",
-	split",DOUBTS THEY'LL EVER FEEL THIS, AGAIN",
+	split",CANT STOP THINKING ABOUT HOW, YOU WERE",
+	split",DOUBTS THEYLL EVER FEEL THIS, AGAIN",
 	split"I HEARD ,SHOUT HOW, THEY FELT ONCE OUTSIDE !",
 	split",WONDERS IF THIS IS AS, AS IT GETS !",
 }
