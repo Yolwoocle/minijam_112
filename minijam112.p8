@@ -86,7 +86,7 @@ function _init()
 
 	dead_list=""
 	dead_list_obj={
-		dobj=create_dobj(128,-87)
+		dobj=create_dobj(128,0)
 	}
 
 
@@ -108,7 +108,7 @@ function _init()
 	past_customers={}
 
 
-	parse_speed=5
+	parse_speed=3
 	text_parse=""
 	ailment=""
 	parse_length=0
@@ -137,10 +137,13 @@ function _init()
 	clock=0
 	maxclock=60*10 -- be careful about overflowing the tiny p8 limit
 	-- clock=maxclock
-	report_shifted_on_right = false
+
+	report_shifted_on_left = false
 	main_menu = true
 
-	if(debugmode) parse_speed = 1
+	time_before_confetti=-1
+
+	-- if(debugmode) parse_speed = 1
 end
 
 function _update60()
@@ -149,7 +152,7 @@ function _update60()
 	update_time()
 	on_speech_end()
 
-	if(report_shifted_on_right) dead_list_obj.dobj.oy-=1/6
+	if(report_shifted_on_left) dead_list_obj.dobj.oy-=1/6
 
 	menuitem(3, "sound: "..(sound_on and "on" or "off"), function() sound_on=not sound_on end)
 
@@ -179,6 +182,16 @@ function _update60()
 		doctor_oy+=1
 	end
 	
+	-- spawn confetti
+	if(time_before_confetti >-1)time_before_confetti-=1
+	if time_before_confetti==0 then
+	-- if btnp(❎) then
+		for i=1,30 do
+			spawn_confetti(5,-10, 10+rnd(60), -10-rnd(50), 0.05+rnd(0.1))
+			spawn_confetti(128+5,-10, -10-rnd(60), -10-rnd(50), 0.05+rnd(0.1))
+		end
+	end
+
 	conveyor_spawner()
 	
 	update_cursor()
@@ -198,9 +211,7 @@ function _draw()
 	
 
 	draw_pot()
-	for b in all(bubbles) do
-		circ(b._x,b._y,b.size,4)
-	end
+	draw_bubbles()
 	rectfill(-5,110,130,130,0)
 	
 	draw_conveyor()
@@ -231,7 +242,11 @@ function _draw()
 	rrect(x,-87+1,61,90,1)
 	rrect(x,-87  ,61,90,4)
 	print(dead_list,x+1,y,5)
-	rectfill(x,5,127,3+31, 8)
+	-- foreground (to hide list)
+	rectfill(x,-91,128,-88, 2)--blue top
+	rectfill(x,5,128,3+31, 2)--blue bottom
+	rectfill(x+1,4,128,4, 0)--lback shadow
+	rectfill(x,35,128,37, 0)--black bottom
 	
 	draw_pdoctor()
 	draw_bubble()
@@ -250,6 +265,8 @@ function _draw()
 	-- draw logo
 	draw_logo()
 	
+	if(c.mode=="report")draw_bubbles()
+
 	if(debugmode)print("debug",1,dy(cam.dobj),8)
 end
 
@@ -268,15 +285,9 @@ function update_dead_list()
 		if(flr(rnd(2))==0)fate=rnd(died_of_variations)..customer.cause
 		local fit=to_fit(customer.name..fate.."\n\n",11)
 		out..=fit
-		
-		-- count number of lines
-		local h=1
-		for i=1,#fit do
-			if(sub(fit,i,i)=="\n")h+=1
-		end
 	end
 
-	dead_list_obj.dobj._y=-110
+	dead_list_obj.dobj._y=200
 	dead_list_obj.dobj.oy=0
 	dead_list=out
 end
@@ -492,21 +503,22 @@ function update_time()
 		if(report.step==8)sfx(55)shake=0.2
 
 		if(report.step==1)anim_to_point(c,_x+70,_y+30)
-		if(report.step>=2 and report.step<=6)anim_to_point(c,_x+10,_y+43+((report.step-2)*8))
+		if(report.step>=2 and report.step<=6)anim_to_point(c,_x+10,_y+48+((report.step-2)*8))
 		if(report.step==7)anim_to_point(c,_x+50,_y+90)
-		
+		if(report.step==8)anim_to_point(c,_x+50,_y+100) --move hand away after signature
 	
+		if(report.step==8)time_before_confetti=50
 
 		report.last_input=time_since_last
 		report.step+=1
 	end
 
-	if time_since_last==1100 then
+	if time_since_last==900 then
 		-- Shift report card to left
 		anim_to_point(report, report.target_x-23, nil, 0.9)
 		anim_to_point(c,c.dobj.wx-23,nil,0.9)
 		anim_to_point(dead_list_obj, 83, nil, 0.9)
-		report_shifted_on_right = true
+		report_shifted_on_left = true
 
 		update_dead_list()
 	end
@@ -854,6 +866,27 @@ function spawn_bubble(_x,_y,_vx,_vy,_gravity)
 		vy= o_vy,
 		gravity=_gravity or 0,
 		size=rnd(3)+1,
+		fill=false,
+		col=4,
+	}
+	add(bubbles,new_bub)
+end
+
+function spawn_confetti(_x,_y,_vx,_vy,_gravity)
+	o_vx=0
+	if(_vx!=nil)o_vx=_vx*0.1
+	o_vy=-0.1
+	if(_vy!=nil)o_vy=_vy*0.1
+
+	local new_bub={
+		_x= _x or 15+rnd(28),
+		_y= _y or 80+rnd(8),
+		vx= o_vx,
+		vy= o_vy,
+		gravity=_gravity or 0,
+		size=rnd(3)+2,
+		fill=true,
+		col=rnd{2,3,4,5,13},
 	}
 	add(bubbles,new_bub)
 end
@@ -867,6 +900,13 @@ function animate_bubbles()
 		if(b.vy!=nil) b.vy*=0.9
 		if(b.gravity!=nil) b.vy+=b.gravity
 		if(b.size<=0)del(bubbles,b)
+	end
+end
+
+function draw_bubbles()
+	for b in all(bubbles) do
+		local f = b.fill and circfill or circ
+		f(b._x,b._y,b.size,b.col)
 	end
 end
 
@@ -1130,7 +1170,7 @@ all_effects=split"TURNS INTO DRAGON,MAKES YOU SHRINK,SUMMONS GIANT PEACH,GLOWS I
 all_solutions={
 	"EXPERIENCING KINETIC ENERGY|HARDENS SKIN,PROBABLY BOOSTS LUCK,RAISES GLASS CEILING",
 	"BEING SHOT BY A SKELETON|TASTES LIKE MILK,QUICKENS REACTIONS",
-	"SWIMMING TO FAR FROM THE SHORE|MAKES YOU FLOAT",
+	"SWIMMING TOO FAR FROM THE SHORE|MAKES YOU FLOAT",
 	"TRYING TO SWIM IN LAVA|MAKES YOU FLOAT,INCREASES FIRE RES,INCREASES POISON RES",
 	"SUMMONING A DEMON|BREAKS FOURTH WALL,PROBABLY BOOSTS LUCK,DISPELS GHOSTS",
 	"LOSING A FIST FIGHT|RAISES HIT POINTS,INCREASES STRENGTH",
@@ -1163,7 +1203,7 @@ all_solutions={
 	"OLD AGE|LOWERS CHOLESTEROL,HARDENS LIVER,RAISES HP",
 	"BOREDOM|TURNS INTO A SWORD,INSTANT DEATH,INSTILLS PARANOIA,JUST GETS YOU STONED,EMITS 5G SIGNAL,AMPLIFIES TINNITUS,TURNS URINE GREEN,SETS YOU ON FIRE,REJUVENATES HAIR GROWTH,FINDS KEYS",
 	"AGGRESSIVE SEALIFE|INCREASES STRENGTH,FACILITATES CONFIDENCE",
-	"HUNGER|SUMMONS GIANT PEACH,FACILITATES DIGESTION,HIGH IN VITAMIN C,REMOVES TASTE,TASTES OF ORANGE,JUST GETS YOU STONED",
+	"HUNGER|FIGHTS POVERTY,SUMMONS GIANT PEACH,FACILITATES DIGESTION,HIGH IN VITAMIN C,REMOVES TASTE,TASTES OF ORANGE,JUST GETS YOU STONED",
 	"NOT BEING TO HANDLE OUR STRONGEST POTION|TURNS INTO DRAGON,RAISES HP,INCREASES MAGIC,INCREASES RESISTANCE,INCREASES STRENGTH,FACILITATES DIGESTION,",
 	"DISCOVERING DYNAMITE|INCREASES RESISTANCE,RAISES HP,STRENGTHENS BONE MARROW,HARDENS SKIN",
 	"CONSTIPATION|FACILITATES DIGESTION,TURNS INTO A TOAD,TASTES LIKE MILK",
