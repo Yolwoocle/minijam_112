@@ -502,11 +502,11 @@ function update_time()
 		if(report.step!=0)sfx(47+report.step)shake=0.1
 		if(report.step==8)sfx(55)shake=0.2
 
-		if(report.step==1)anim_to_point(c,_x+70,_y+30)
-		if(report.step>=2 and report.step<=6)anim_to_point(c,_x+10,_y+48+((report.step-2)*8))
-		if(report.step==7)anim_to_point(c,_x+50,_y+90)
-		if(report.step==8)anim_to_point(c,_x+50,_y+100) --move hand away after signature
-	
+		if(report.step==1)anim_to_point(c,_x+70,_y+30,0.9)
+		if(report.step>=2 and report.step<=6)anim_to_point(c,_x+7,_y+45+((report.step-2)*8),0.9)
+		if(report.step==7)anim_to_point(c,_x+50,_y+90,0.9)
+		
+		if(report.step==8)anim_to_point(c,_x+50,_y+100,0.9) --move hand away after signature
 		if(report.step==8)time_before_confetti=50
 
 		report.last_input=time_since_last
@@ -1176,7 +1176,7 @@ all_solutions={
 	"LOSING A FIST FIGHT|RAISES HIT POINTS,INCREASES STRENGTH",
 	"BEING POISONED|INDUCES VOMITING,BOOSTS TASTE",
 	"AN ARROW TO THE KNEE|INCREASE COORDINATION",
-	"SINKING IN QUICKSANT|MAKES YOU FLOAT",
+	"SINKING IN QUICKSAND|MAKES YOU FLOAT",
 	"ASSASSINATION|RAISES SEX APPEAL,HEIGHTENS AWARENESS,INSTILLS PARANOIA",
 	"A HUNTING ACCIDENT|QUICKENS REACTIONS,HEIGHTENS AWARENESS,GLOWS IN THE DARK",
 	"A BROKEN HEART|HIGH IN VITAMIN C,LOWERS CHOLESTEROL,RAISES SEX APPEAL,RELEASES PHEROMONES,FACILITATES CONFIDENCE,HARDENS SKIN",
