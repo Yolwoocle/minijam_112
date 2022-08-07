@@ -529,7 +529,8 @@ function update_time()
 	end
 
 	if time_since_last==430 then
-		new_dialogue("WHAT A"," WONDERFUL ","DAY !")
+		local adjectives=split" WONDERFUL , FANTASTIC "
+		new_dialogue("WHAT A",rnd(adjectives),"DAY !")
 	end
 
 	if time_since_last==700 then
