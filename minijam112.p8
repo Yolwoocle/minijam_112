@@ -7,7 +7,7 @@ __lua__
 -- main
 
 debug=""
-debugmode=false
+debugmode=true
 
 sound_on=true
 
@@ -23,9 +23,10 @@ function _init()
 	shake=0
 	in_menu=true
 	menu_new_dialogue_wait=400
+	report_fin_time=0
 
 	cam={
-		dobj=create_dobj(0,-91),
+		dobj=create_dobj(-133,-200),
 	}
 
 	report={
@@ -50,13 +51,14 @@ function _init()
 
 	logo={
 		default_x=18,
+		default_y=-80,
 		dobj=create_dobj(18,-80),
 	}
 	
 	c={
 		dobj=create_dobj(63,63),
 		sel_index=1,
-		mode="menu"
+		mode="launch"
 	}
 
 	ticks={false,false,false}
@@ -123,9 +125,6 @@ function _init()
 
 	doctor_oy=0
 
-	--new_ailment()
-	new_dialogue("I CAN'T WAIT TO ","HELP"," PEOPLE TODAY!")
-
 	g_ingredients={
 	}
 
@@ -134,7 +133,7 @@ function _init()
 
 	time_percentage=0
 	clock=0
-	maxclock=60*90 -- be careful about overflowing the tiny p8 limit
+	maxclock=60*60 -- be careful about overflowing the tiny p8 limit
 
 	report_shifted_on_left = false
 
@@ -144,23 +143,46 @@ function _init()
 	spoon={
 		dobj=create_dobj(0,0)
 	}
+
+	--credits stuff--
+	credits_text={"made by","LOUIE CHAPMAN THE ","YOLWOOCLE THE "}
+	lou_adj=rnd(positive_adj)
+	yol_adj=rnd(positive_adj)
+	while #lou_adj+#credits_text[2]>27 do
+		lou_adj=rnd(positive_adj)
+	end
+	while #yol_adj+#credits_text[3]>27 do
+		yol_adj=rnd(positive_adj)
+	end
+
+	anim_to_point(cam,nil,-91,0.9)
+	prog_launch=0
+	music(0)
 end
 
 function _update60()
 	t+=1
 
+	update_cursor()
+
+	if c.mode=="launch" then
+		prog_launch+=1
+		if prog_launch==400 or btnp(❎) or btnp(🅾️) or btnp(⬅️) or btnp(➡️) then
+			c.mode="menu"
+			anim_to_point(cam,0,-91,0.9)
+			sfx(58)
+			new_dialogue("I CANT WAIT TO ","HELP"," PEOPLE TODAY!")
+		end
+	end
+
 	conv_mod=conv_default
-	if(time_percentage>10)conv_mod=4 spawn_rate=75
-	if(time_percentage>30)conv_mod=3 spawn_rate=50
-	if(time_percentage>50)conv_mod=2 spawn_rate=30
-	if(time_percentage>80)conv_mod=1 spawn_rate=20
-	
-	
-	debug=c.mode
-	
+	if(time_percentage>30)conv_mod=4 spawn_rate=75
+	if(time_percentage>50)conv_mod=3 spawn_rate=50
+	if(time_percentage>70)conv_mod=2 spawn_rate=30
+		
 	
 	update_time()
-	on_speech_end()
+	leave_menu()
 
 	update_menu()
 
@@ -206,7 +228,6 @@ function _update60()
 	end
 
 	
-	update_cursor()
 	animate_ingredients()
 	
 	animate_bubbles()
@@ -221,14 +242,16 @@ function _update60()
 end
 
 function _draw()
-	cls(0)
+	cls(2)
 	screen_shake()
 	camera(dx(cam.dobj),dy(cam.dobj))
 	
+	rectfill(-150,35,130,130,0)
 
 	draw_pot()
 	draw_bubbles()
-	rectfill(-5,110,130,130,0)
+	rectfill(-150,110,130,130,0)
+	
 	
 	draw_conveyor()
 
@@ -244,7 +267,7 @@ function _draw()
 	end
 
 
-	rectfill(-5,-120,135,34,2)
+	rectfill(-5,-40,60,30,2)
 
 
 	draw_time()
@@ -265,6 +288,8 @@ function _draw()
 	end
 
 	draw_logo()
+
+	draw_credits()
 	
 	if(bubbles_on_foreground)draw_bubbles()
 
@@ -288,7 +313,8 @@ function reset_data()
 	report.last_input=0
 
 	bubbles_on_foreground=false
-	
+
+	report_fin_time=0
 
 	ticks={false,false,false}
 
@@ -377,7 +403,7 @@ function update_menu()
 		pack("EVERYTHING HAPPENS FOR A"," REASON"," !"),
 		pack("IM SO"," PROUD"," OF YOU !"),
 	}
-	if(time_since_last%menu_new_dialogue_wait==0 and not parsing)then
+	if(time_since_last%menu_new_dialogue_wait==0 and not parsing and c.mode=="menu")then
 		new_dialogue(unpack(rnd(phrases)))
 		menu_new_dialogue_wait=flr(400+rnd(200))
 		time_since_last=0
@@ -385,7 +411,7 @@ function update_menu()
 end
 
 function update_dead_list()
-	local ways_to_die=split" WAS NEVER SEEN AGAIN, STILL GETS NIGHTMARES, HASN'T STOPPED CRYING,'S FAMILY MISSES THEM, NEVER MADE IT HOME, WILL NEVER RETURN, DIED A GRUESOME DEATH, LEFT THEIR WALLET, IS SUFFERING ANXIETY, HASN'T EATEN IN DAYS, WAS ARRESTED, IS NOW IN JAIL, SUFFERED A FATE WORSE THAN DEATH, IS NOT THE SAME ANYMORE, COULDN'T HANDLE OUR STRONGEST POTIONS"
+	local ways_to_die=split" WAS NEVER SEEN AGAIN, STILL GETS NIGHTMARES, HASNT STOPPED CRYING,S FAMILY MISSES THEM, NEVER MADE IT HOME, WILL NEVER RETURN, DIED A GRUESOME DEATH, LEFT THEIR WALLET, IS SUFFERING ANXIETY, HASNT EATEN IN DAYS, WAS ARRESTED, IS NOW IN JAIL, SUFFERED A FATE WORSE THAN DEATH, IS NOT THE SAME ANYMORE, COULDNT HANDLE OUR STRONGEST POTIONS"
 	local died_of_variations=split" DIED OF "
 	for customer in all(past_customers) do
 		if customer.score<0 then
@@ -429,6 +455,25 @@ end
 
 
 function update_cursor()
+	if c.mode=="menu" then
+		if(btnp(⬅️) or btnp(➡️) and time_since_last!=0) then
+			c.mode="credits"
+			credits_new_adj()
+			anim_to_point(cam,-133,-91,0.9)
+			sfx(58)
+			return
+		end
+	end
+
+	if c.mode=="credits" then
+		if(btnp(⬅️) or btnp(➡️) and time_since_last!=0) then
+			c.mode="menu"
+			anim_to_point(cam,0,-91,0.9)
+			sfx(58)
+			return
+		end
+	end
+
 	if c.mode=="ingredients" then
 		for i=0,1 do --move cursor direction from input
 			if btnp(i) then
@@ -562,6 +607,7 @@ function update_time()
 
 	if clock==maxclock then
 		--end game
+
 		c.mode="report"
 		clock=0
 		conveyor_active=false
@@ -624,6 +670,7 @@ function update_time()
 		if(report.step==8)anim_to_point(c,_x+50,_y+100,c_anim_speed) --move hand away after signature
 	
 		if(report.step==8) then
+			report_fin_time=time_since_last
 			time_before_confetti=50 
 			bubbles_on_foreground=true
 			anim_to_point(c,nil,45,0.95)
@@ -641,18 +688,33 @@ function update_time()
 		report_shifted_on_left = true
 	end
 
-	--to finish the round
-	if(time_since_last>750 and report.step==10 and btnp(❎)) then
-		to_menu()
-		--init_and_start_round()
+	--finished the report
+	if report_fin_time>0 then
+		local time_since_fin=time_since_last-report_fin_time
+
+		if(time_since_fin==120)anim_to_point(report,130,nil)
+
+		--to finish the round
+		if(time_since_fin==150) then
+			to_menu()
+		end
 	end
 end
 
 function to_menu()
-	--c.mode="menu"
+	c.mode="menu"
 	in_menu=true
+	time_since_last=0
+
+	report.dobj.wx=150
+	anim_to_point(dead_list_obj,135,nil,0.9)
 
 	logo.dobj.wx=logo.default_x
+	logo.dobj.wy=-130
+	anim_to_point(logo,nil,logo.default_y,0.95)
+
+	hide_bubble=false
+	new_dialogue("I CANT WAIT TO ","HELP"," PEOPLE TODAY!")
 end
 
 function draw_time()
@@ -740,6 +802,51 @@ function draw_bubble()
 	local spry=speech_arrow_up and 4 or 20
 	sspr(0,27,7,5, _x+_w+1, _y+spry+oy+1)
 	sspr(37,0,7,5, _x+_w+1, _y+spry+oy)
+end
+
+function credits_new_adj()
+	lou_adj=rnd(positive_adj)
+	yol_adj=rnd(positive_adj)
+	
+	while #lou_adj+#credits_text[2]>27 do
+		lou_adj=rnd(positive_adj)
+	end
+	
+	while #yol_adj+#credits_text[3]>27 do
+		yol_adj=rnd(positive_adj)
+	end
+end
+
+function draw_credits()
+	local _x,_y=-133,-91
+		
+	local _c1,_c2=5,3
+	local _y0,_y1,_y2=27+_y,40+_y,47+_y
+
+	--made by
+	rrect(hcentre(credits_text[1])-3+_x,_y0-3,32,11,1)
+	rrect(hcentre(credits_text[1])-3+_x,_y0-3,32,10,7)
+	print(credits_text[1],hcentre(credits_text[1])+_x,_y0,5)
+
+	--names
+	local w1,w2=(#credits_text[2]+#lou_adj)*4,(#credits_text[3]+#yol_adj)*4
+	if(w2>w1)w1=w2
+	local width=(w1)
+	local left_align=64-(width*0.5)
+	rrect(64-(width*0.5)-2+_x,_y1-1,2+width,16,1)
+	rrect(64-(width*0.5)-2+_x,_y1-2,2+width,16,7)
+
+	local align=hcentre(credits_text[2]..lou_adj)+_x
+	print(credits_text[2],align,_y1,_c1)
+	print(lou_adj,align+(#credits_text[2]*4),_y1,_c2)
+
+	local align=hcentre(credits_text[3]..yol_adj)+_x
+	print(credits_text[3],align,_y2,_c1)
+	print(yol_adj,align+(#credits_text[3]*4),_y2,_c2)
+
+	--twitter tags
+	text_bold2("@0Xffb3",3+_x,108+_y,7,5)
+	text_bold2("@YOOLWOOCLE_",3+_x,117+_y,7,5)
 end
 
 
@@ -956,8 +1063,8 @@ function update_anim()
 	end
 end
 
-function on_speech_end()
-	if in_menu and parsing==false and c.mode=="menu" then
+function leave_menu()
+	if in_menu and parsing==false and c.mode=="menu" and time_since_last!=0 then
 		if btnp(❎) then
 			init_and_start_round()
 		end
@@ -1359,7 +1466,7 @@ result_dialogue={
 	split",HAS NEVER FELT THIS, BEFORE !",
 	split",WILL LIKELY SUFFER A, DEATH !",
 	split"YOU THOUGHT ,WAS,.",
-	split",CAN'T STOP THINKING ABOUT HOW, YOU WERE",
+	split",CANT STOP THINKING ABOUT HOW, YOU WERE",
 	split",DOUBTS THEYLL EVER FEEL THIS, AGAIN",
 	split"I HEARD ,SHOUT HOW, THEY FELT ONCE OUTSIDE !",
 	split",WONDERS IF THIS IS AS, AS IT GETS !",
@@ -1714,5 +1821,11 @@ __music__
 00 41424344
 03 0b0c4d44
 00 1e424344
+00 41424344
 00 15424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+03 090a4344
 
