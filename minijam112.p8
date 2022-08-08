@@ -367,7 +367,7 @@ function update_menu()
 	local phrases={
 		pack("IM SO"," EXCITED"," !"),
 		pack("I"," LOVE"," YOU !"),
-		pack("I CANT WAIT TO "," HELP"," EVERYONE TODAY !"),
+		pack("I CAN'T WAIT TO "," HELP"," EVERYONE TODAY !"),
 		pack("MY POISON IS YOUR"," MEDICINE"," !"),
 		pack("MEDICINE IS MY"," PASSION"," !"),
 		pack("YOU LOOK SO"," GOOD"," TODAY !"),
